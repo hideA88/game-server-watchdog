@@ -16,8 +16,8 @@ run: build ## Build and run the watchdog
 	./bin/watchdog
 
 .PHONY: test
-test: ## Run all tests
-	go test -v ./...
+test: ## Run tests
+	go tool gotestsum --format testname -- -v -race -cover ./...
 
 .PHONY: test-coverage
 test-coverage: ## Run tests with coverage report
