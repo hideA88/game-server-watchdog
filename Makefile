@@ -31,7 +31,12 @@ clean: ## Remove build artifacts
 
 .PHONY: lint
 lint: ## Run golangci-lint
-	golangci-lint run
+	go tool golangci-lint run
+
+.PHONY: format
+format: ## Format code
+	go tool goimports -w .
+	go fmt ./...
 
 .PHONY: tidy
 tidy: ## Tidy go.mod file
@@ -41,7 +46,4 @@ tidy: ## Tidy go.mod file
 deps: ## Update all dependencies
 	go get -u ./...
 
-.PHONY: install-linter
-install-linter: ## Install golangci-lint
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
 
