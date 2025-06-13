@@ -6,6 +6,7 @@ import (
 
 	"github.com/hideA88/game-server-watchdog/internal/bot/command"
 	"github.com/hideA88/game-server-watchdog/internal/config"
+	"github.com/hideA88/game-server-watchdog/pkg/system"
 )
 
 func TestNewRouter(t *testing.T) {
@@ -22,14 +23,15 @@ func TestNewRouter(t *testing.T) {
 				AllowedChannelIDs: []string{},
 				AllowedUserIDs:    []string{},
 			},
-			wantCommands:     []string{"ping", "help"},
-			wantCommandCount: 2,
+			wantCommands:     []string{"ping", "help", "status"},
+			wantCommandCount: 3,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := NewRouter(tt.config)
+			mockMonitor := &system.MockMonitor{}
+			router := NewRouter(tt.config, mockMonitor)
 
 			// ルーターが正しく初期化されているか確認
 			if router == nil {
@@ -262,7 +264,18 @@ func TestRouter_ExecuteCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := NewRouter(&config.Config{})
+			mockMonitor := &system.MockMonitor{
+				SystemInfo: &system.SystemInfo{
+					CPUUsagePercent:   50.0,
+					MemoryUsedGB:      8.0,
+					MemoryTotalGB:     16.0,
+					MemoryUsedPercent: 50.0,
+					DiskFreeGB:        100.0,
+					DiskTotalGB:       200.0,
+					DiskUsedPercent:   50.0,
+				},
+			}
+			router := NewRouter(&config.Config{}, mockMonitor)
 			
 			gotResult, err := router.ExecuteCommand(tt.commandName, tt.args)
 			
