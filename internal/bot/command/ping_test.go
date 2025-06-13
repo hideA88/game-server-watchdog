@@ -77,12 +77,12 @@ func TestPingCommand_Execute(t *testing.T) {
 			t.Parallel()
 			cmd := NewPingCommand()
 			got, err := cmd.Execute(tt.args)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if got != tt.want {
 				t.Errorf("Execute() = %v, want %v", got, tt.want)
 			}

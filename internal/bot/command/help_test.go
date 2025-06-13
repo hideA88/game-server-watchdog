@@ -54,10 +54,10 @@ func TestHelpCommand_Description(t *testing.T) {
 func TestHelpCommand_SetCommands(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name          string
-		commands      []Command
-		wantCount     int
-		wantCommands  []string
+		name         string
+		commands     []Command
+		wantCount    int
+		wantCommands []string
 	}{
 		{
 			name: "2つのコマンドを設定",
@@ -69,10 +69,10 @@ func TestHelpCommand_SetCommands(t *testing.T) {
 			wantCommands: []string{"ping", "help"},
 		},
 		{
-			name:          "空のコマンドスライスを設定",
-			commands:      []Command{},
-			wantCount:     0,
-			wantCommands:  []string{},
+			name:         "空のコマンドスライスを設定",
+			commands:     []Command{},
+			wantCount:    0,
+			wantCommands: []string{},
 		},
 	}
 
@@ -127,14 +127,14 @@ func TestHelpCommand_Execute(t *testing.T) {
 			t.Parallel()
 			cmd := NewHelpCommand()
 			cmd.SetCommands(tt.commands)
-			
+
 			got, err := cmd.Execute(tt.args)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			// マップの順序が不定なので、含まれているかチェック
 			if tt.name == "コマンド一覧を表示" && len(tt.commands) > 0 {
 				expectedParts := []string{

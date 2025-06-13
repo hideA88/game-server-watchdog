@@ -6,14 +6,13 @@ import (
 	"testing"
 )
 
-
 func TestLoad(t *testing.T) {
 	tests := []struct {
-		name    string
-		envVars map[string]string
-		want    *Config
-		wantErr bool
-		setupFunc func()
+		name        string
+		envVars     map[string]string
+		want        *Config
+		wantErr     bool
+		setupFunc   func()
 		cleanupFunc func()
 	}{
 		{
@@ -144,7 +143,7 @@ func TestLoad(t *testing.T) {
 // テスト用の.envファイルを作成するヘルパー関数
 func createTestEnvFile(t *testing.T, content string) func() {
 	t.Helper()
-	
+
 	// 既存の.envファイルをバックアップ
 	data, err := os.ReadFile(".env")
 	hasBackup := err == nil
@@ -158,7 +157,7 @@ func createTestEnvFile(t *testing.T, content string) func() {
 	return func() {
 		if hasBackup {
 			// バックアップを復元
-			os.WriteFile(".env", data, 0644)
+			_ = os.WriteFile(".env", data, 0644)
 		} else {
 			// .envファイルを削除
 			os.Remove(".env")

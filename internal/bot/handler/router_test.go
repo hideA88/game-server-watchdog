@@ -100,85 +100,85 @@ func TestRouter_RegisterCommand(t *testing.T) {
 func TestParseCommand(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name         string
-		content      string
-		mentions     []string
-		wantCommand  string
-		wantArgs     []string
+		name        string
+		content     string
+		mentions    []string
+		wantCommand string
+		wantArgs    []string
 	}{
 		{
-			name:         "メンション付きpingコマンド",
-			content:      "<@123456> ping",
-			mentions:     []string{"123456"},
-			wantCommand:  "ping",
-			wantArgs:     []string{},
+			name:        "メンション付きpingコマンド",
+			content:     "<@123456> ping",
+			mentions:    []string{"123456"},
+			wantCommand: "ping",
+			wantArgs:    []string{},
 		},
 		{
-			name:         "メンション付きhelpコマンド",
-			content:      "<@123456> help",
-			mentions:     []string{"123456"},
-			wantCommand:  "help",
-			wantArgs:     []string{},
+			name:        "メンション付きhelpコマンド",
+			content:     "<@123456> help",
+			mentions:    []string{"123456"},
+			wantCommand: "help",
+			wantArgs:    []string{},
 		},
 		{
-			name:         "複数メンション付きコマンド",
-			content:      "<@123456> <@789012> ping test",
-			mentions:     []string{"123456", "789012"},
-			wantCommand:  "ping",
-			wantArgs:     []string{"test"},
+			name:        "複数メンション付きコマンド",
+			content:     "<@123456> <@789012> ping test",
+			mentions:    []string{"123456", "789012"},
+			wantCommand: "ping",
+			wantArgs:    []string{"test"},
 		},
 		{
-			name:         "ニックネーム形式のメンション",
-			content:      "<@!123456> ping",
-			mentions:     []string{"123456"},
-			wantCommand:  "ping",
-			wantArgs:     []string{},
+			name:        "ニックネーム形式のメンション",
+			content:     "<@!123456> ping",
+			mentions:    []string{"123456"},
+			wantCommand: "ping",
+			wantArgs:    []string{},
 		},
 		{
-			name:         "引数付きコマンド",
-			content:      "<@123456> test arg1 arg2",
-			mentions:     []string{"123456"},
-			wantCommand:  "test",
-			wantArgs:     []string{"arg1", "arg2"},
+			name:        "引数付きコマンド",
+			content:     "<@123456> test arg1 arg2",
+			mentions:    []string{"123456"},
+			wantCommand: "test",
+			wantArgs:    []string{"arg1", "arg2"},
 		},
 		{
-			name:         "空のコンテンツ",
-			content:      "",
-			mentions:     []string{},
-			wantCommand:  "",
-			wantArgs:     nil,
+			name:        "空のコンテンツ",
+			content:     "",
+			mentions:    []string{},
+			wantCommand: "",
+			wantArgs:    nil,
 		},
 		{
-			name:         "メンションのみ",
-			content:      "<@123456>",
-			mentions:     []string{"123456"},
-			wantCommand:  "",
-			wantArgs:     nil,
+			name:        "メンションのみ",
+			content:     "<@123456>",
+			mentions:    []string{"123456"},
+			wantCommand: "",
+			wantArgs:    nil,
 		},
 		{
-			name:         "スペースのみ",
-			content:      "   ",
-			mentions:     []string{},
-			wantCommand:  "",
-			wantArgs:     nil,
+			name:        "スペースのみ",
+			content:     "   ",
+			mentions:    []string{},
+			wantCommand: "",
+			wantArgs:    nil,
 		},
 		{
-			name:         "大文字のコマンド",
-			content:      "<@123456> PING",
-			mentions:     []string{"123456"},
-			wantCommand:  "ping",
-			wantArgs:     []string{},
+			name:        "大文字のコマンド",
+			content:     "<@123456> PING",
+			mentions:    []string{"123456"},
+			wantCommand: "ping",
+			wantArgs:    []string{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotCommand, gotArgs := ParseCommand(tt.content, tt.mentions)
-			
+
 			if gotCommand != tt.wantCommand {
 				t.Errorf("ParseCommand() command = %v, want %v", gotCommand, tt.wantCommand)
 			}
-			
+
 			if !reflect.DeepEqual(gotArgs, tt.wantArgs) {
 				t.Errorf("ParseCommand() args = %v, want %v", gotArgs, tt.wantArgs)
 			}
@@ -250,7 +250,7 @@ func TestRouter_ExecuteCommand(t *testing.T) {
 			name:        "helpコマンド実行",
 			commandName: "help",
 			args:        []string{},
-			wantResult:  "",  // 実際の内容はテストしない
+			wantResult:  "", // 実際の内容はテストしない
 			wantErr:     false,
 		},
 		{
@@ -276,18 +276,18 @@ func TestRouter_ExecuteCommand(t *testing.T) {
 				},
 			}
 			router := NewRouter(&config.Config{}, mockMonitor)
-			
+
 			gotResult, err := router.ExecuteCommand(tt.commandName, tt.args)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ExecuteCommand() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.commandName == "ping" && gotResult != tt.wantResult {
 				t.Errorf("ExecuteCommand() result = %v, want %v", gotResult, tt.wantResult)
 			}
-			
+
 			if tt.commandName == "help" && !tt.wantErr && gotResult == "" {
 				t.Error("ExecuteCommand() help command should return non-empty result")
 			}

@@ -59,11 +59,11 @@ func TestStatusCommand_Description(t *testing.T) {
 func TestStatusCommand_Execute(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name       string
-		systemInfo *system.SystemInfo
-		mockErr    error
-		args       []string
-		wantErr    bool
+		name         string
+		systemInfo   *system.SystemInfo
+		mockErr      error
+		args         []string
+		wantErr      bool
 		wantContains []string
 	}{
 		{
@@ -103,14 +103,14 @@ func TestStatusCommand_Execute(t *testing.T) {
 				Err:        tt.mockErr,
 			}
 			cmd := NewStatusCommand(mockMonitor)
-			
+
 			got, err := cmd.Execute(tt.args)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr {
 				for _, want := range tt.wantContains {
 					if !strings.Contains(got, want) {

@@ -9,11 +9,11 @@ import (
 func TestIsAuthorized(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name              string
-		config            *config.Config
-		channelID         string
-		userID            string
-		expectedResult    bool
+		name           string
+		config         *config.Config
+		channelID      string
+		userID         string
+		expectedResult bool
 	}{
 		{
 			name: "制限なし - 全員許可",

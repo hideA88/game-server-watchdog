@@ -4,7 +4,6 @@ import (
 	"testing"
 )
 
-
 func TestDefaultMonitor_GetSystemInfo(t *testing.T) {
 	t.Parallel()
 
