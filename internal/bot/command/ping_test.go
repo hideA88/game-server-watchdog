@@ -5,6 +5,7 @@ import (
 )
 
 func TestPingCommand_Name(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		want string
@@ -17,6 +18,7 @@ func TestPingCommand_Name(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			cmd := NewPingCommand()
 			if got := cmd.Name(); got != tt.want {
 				t.Errorf("Name() = %v, want %v", got, tt.want)
@@ -26,6 +28,7 @@ func TestPingCommand_Name(t *testing.T) {
 }
 
 func TestPingCommand_Description(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		want string
@@ -38,6 +41,7 @@ func TestPingCommand_Description(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			cmd := NewPingCommand()
 			if got := cmd.Description(); got != tt.want {
 				t.Errorf("Description() = %v, want %v", got, tt.want)
@@ -47,6 +51,7 @@ func TestPingCommand_Description(t *testing.T) {
 }
 
 func TestPingCommand_Execute(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		args    []string
@@ -69,6 +74,7 @@ func TestPingCommand_Execute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			cmd := NewPingCommand()
 			got, err := cmd.Execute(tt.args)
 			

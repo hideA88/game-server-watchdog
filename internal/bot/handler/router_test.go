@@ -9,6 +9,7 @@ import (
 )
 
 func TestNewRouter(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		config           *config.Config
@@ -55,6 +56,7 @@ func TestNewRouter(t *testing.T) {
 }
 
 func TestRouter_RegisterCommand(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		command     command.Command
@@ -94,6 +96,7 @@ func TestRouter_RegisterCommand(t *testing.T) {
 }
 
 func TestParseCommand(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		content      string
@@ -182,6 +185,7 @@ func TestParseCommand(t *testing.T) {
 }
 
 func TestCheckMention(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		mentions     []string
@@ -225,6 +229,7 @@ func TestCheckMention(t *testing.T) {
 }
 
 func TestRouter_ExecuteCommand(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		commandName string

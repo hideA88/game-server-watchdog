@@ -41,6 +41,8 @@
 
 **必ずテーブル駆動テスト（Table-Driven Tests）で実装すること**
 
+テストはデフォルトでCPUコア数に応じて並列実行されます。並列実行に適したテストの場合は`t.Parallel()`を追加してください。
+
 ```go
 func TestFunctionName(t *testing.T) {
     tests := []struct {

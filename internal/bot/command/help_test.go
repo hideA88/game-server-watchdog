@@ -6,6 +6,7 @@ import (
 )
 
 func TestHelpCommand_Name(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		want string
@@ -18,6 +19,7 @@ func TestHelpCommand_Name(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			cmd := NewHelpCommand()
 			if got := cmd.Name(); got != tt.want {
 				t.Errorf("Name() = %v, want %v", got, tt.want)
@@ -27,6 +29,7 @@ func TestHelpCommand_Name(t *testing.T) {
 }
 
 func TestHelpCommand_Description(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		want string
@@ -39,6 +42,7 @@ func TestHelpCommand_Description(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			cmd := NewHelpCommand()
 			if got := cmd.Description(); got != tt.want {
 				t.Errorf("Description() = %v, want %v", got, tt.want)
@@ -48,6 +52,7 @@ func TestHelpCommand_Description(t *testing.T) {
 }
 
 func TestHelpCommand_SetCommands(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		commands      []Command
@@ -73,6 +78,7 @@ func TestHelpCommand_SetCommands(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			cmd := NewHelpCommand()
 			cmd.SetCommands(tt.commands)
 
@@ -92,6 +98,7 @@ func TestHelpCommand_SetCommands(t *testing.T) {
 }
 
 func TestHelpCommand_Execute(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		commands []Command
@@ -117,6 +124,7 @@ func TestHelpCommand_Execute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			cmd := NewHelpCommand()
 			cmd.SetCommands(tt.commands)
 			

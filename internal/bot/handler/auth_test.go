@@ -7,6 +7,7 @@ import (
 )
 
 func TestIsAuthorized(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name              string
 		config            *config.Config
