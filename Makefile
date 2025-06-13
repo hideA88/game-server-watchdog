@@ -24,6 +24,14 @@ test-coverage: ## Run tests with coverage report
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out
 
+.PHONY: coverage-filtered
+coverage-filtered: ## Show coverage excluding files in .coverageignore
+	go test -coverprofile=coverage.out.tmp ./...
+	@./scripts/filter-coverage.sh coverage.out.tmp coverage.out
+	@rm -f coverage.out.tmp
+	@echo "Coverage (excluding ignored files):"
+	@go tool cover -func=coverage.out | tail -1
+
 .PHONY: test-short
 test-short: ## Run short tests
 	go test -short ./...

@@ -27,10 +27,17 @@
 
 ## 開発時の注意事項
 
+### コード品質管理
+**コードの修正や追加を行った際は、必ず以下のコマンドを実行してください：**
+1. `make format`: コードのフォーマット
+2. `make lint`: lintチェック（エラーが出た場合は必ず修正）
+
 ### コマンド実行
+- `make format`: コードのフォーマット（goimports + go fmt）
 - `make lint`: コードのlintチェック
 - `make test`: 全テストを実行
 - `make test-coverage`: カバレッジ付きでテスト実行
+- `make coverage-filtered`: カバレッジ計測（.coverageignoreに記載されたファイルを除外）
 - `go run cmd/watchdog/main.go`: ボット起動
 
 ### 新しいハンドラー追加時
@@ -87,6 +94,14 @@ func TestFunctionName(t *testing.T) {
     }
 }
 ```
+
+### カバレッジ計測
+- `.coverageignore`ファイルにカバレッジから除外したいファイルパターンを記載
+- 現在除外されているファイル：
+  - `cmd/watchdog/main.go`: main関数
+  - `internal/bot/bot.go`: 依存性の組み立てのみ
+  - `**/mock*.go`: モックファイル
+  - `**/generated*.go`: 生成されたファイル
 
 ### セキュリティ
 - Discord tokenは絶対にコミットしない

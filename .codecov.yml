@@ -17,4 +17,6 @@ comment:
 ignore:
   - "**/*_test.go"
   - "**/mock_*.go"
+  - "**/generated*.go"
   - "cmd/watchdog/main.go"
+  - "internal/bot/bot.go"
