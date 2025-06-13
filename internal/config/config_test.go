@@ -1,0 +1,229 @@
+package config
+
+import (
+	"os"
+	"reflect"
+	"testing"
+)
+
+
+func TestLoad(t *testing.T) {
+	tests := []struct {
+		name    string
+		envVars map[string]string
+		want    *Config
+		wantErr bool
+		setupFunc func()
+		cleanupFunc func()
+	}{
+		{
+			name: "すべての環境変数が設定されている",
+			envVars: map[string]string{
+				"DISCORD_TOKEN":       "test-token",
+				"DEBUG_MODE":          "true",
+				"ALLOWED_CHANNEL_IDS": "123,456,789",
+				"ALLOWED_USER_IDS":    "111,222,333",
+			},
+			want: &Config{
+				DiscordToken:      "test-token",
+				DebugMode:         true,
+				AllowedChannelIDs: []string{"123", "456", "789"},
+				AllowedUserIDs:    []string{"111", "222", "333"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "必須項目のみ設定",
+			envVars: map[string]string{
+				"DISCORD_TOKEN": "test-token",
+			},
+			want: &Config{
+				DiscordToken:      "test-token",
+				DebugMode:         false,
+				AllowedChannelIDs: nil,
+				AllowedUserIDs:    nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "DEBUG_MODEが無効な値",
+			envVars: map[string]string{
+				"DISCORD_TOKEN": "test-token",
+				"DEBUG_MODE":    "invalid",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "空のチャンネルIDとユーザーID",
+			envVars: map[string]string{
+				"DISCORD_TOKEN":       "test-token",
+				"ALLOWED_CHANNEL_IDS": "",
+				"ALLOWED_USER_IDS":    "",
+			},
+			want: &Config{
+				DiscordToken:      "test-token",
+				DebugMode:         false,
+				AllowedChannelIDs: []string{},
+				AllowedUserIDs:    []string{},
+			},
+			wantErr: false,
+		},
+		{
+			name: ".envファイルが存在しない場合でも環境変数から読み込む",
+			envVars: map[string]string{
+				"DISCORD_TOKEN": "test-token",
+			},
+			want: &Config{
+				DiscordToken:      "test-token",
+				DebugMode:         false,
+				AllowedChannelIDs: nil,
+				AllowedUserIDs:    nil,
+			},
+			wantErr: false,
+			setupFunc: func() {
+				// .envファイルが存在しないことを確認
+				os.Remove(".env")
+			},
+		},
+		{
+			name:    "必須項目が不足",
+			envVars: map[string]string{},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 既存の環境変数を保存
+			originalEnv := make(map[string]string)
+			for key := range tt.envVars {
+				originalEnv[key] = os.Getenv(key)
+			}
+
+			// setup
+			if tt.setupFunc != nil {
+				tt.setupFunc()
+			}
+
+			// テスト用の環境変数を設定
+			for key, value := range tt.envVars {
+				os.Setenv(key, value)
+			}
+
+			// テスト実行
+			got, err := Load()
+
+			// クリーンアップ
+			for key, value := range originalEnv {
+				if value == "" {
+					os.Unsetenv(key)
+				} else {
+					os.Setenv(key, value)
+				}
+			}
+
+			if tt.cleanupFunc != nil {
+				tt.cleanupFunc()
+			}
+
+			// アサーション
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Load() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Load() = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+// テスト用の.envファイルを作成するヘルパー関数
+func createTestEnvFile(t *testing.T, content string) func() {
+	t.Helper()
+	
+	// 既存の.envファイルをバックアップ
+	data, err := os.ReadFile(".env")
+	hasBackup := err == nil
+
+	// テスト用の.envファイルを作成
+	if err := os.WriteFile(".env", []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test .env file: %v", err)
+	}
+
+	// クリーンアップ関数を返す
+	return func() {
+		if hasBackup {
+			// バックアップを復元
+			os.WriteFile(".env", data, 0644)
+		} else {
+			// .envファイルを削除
+			os.Remove(".env")
+		}
+	}
+}
+
+func TestLoad_WithEnvFile(t *testing.T) {
+	tests := []struct {
+		name    string
+		envFile string
+		want    *Config
+		wantErr bool
+	}{
+		{
+			name: ".envファイルから読み込み",
+			envFile: `DISCORD_TOKEN=env-file-token
+DEBUG_MODE=true
+ALLOWED_CHANNEL_IDS=111,222
+ALLOWED_USER_IDS=333,444`,
+			want: &Config{
+				DiscordToken:      "env-file-token",
+				DebugMode:         true,
+				AllowedChannelIDs: []string{"111", "222"},
+				AllowedUserIDs:    []string{"333", "444"},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 環境変数をクリア
+			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS"}
+			originalEnv := make(map[string]string)
+			for _, key := range envKeys {
+				originalEnv[key] = os.Getenv(key)
+				os.Unsetenv(key)
+			}
+
+			// テスト用の.envファイルを作成
+			cleanup := createTestEnvFile(t, tt.envFile)
+			defer cleanup()
+
+			// テスト実行
+			got, err := Load()
+
+			// 環境変数を復元
+			for key, value := range originalEnv {
+				if value == "" {
+					os.Unsetenv(key)
+				} else {
+					os.Setenv(key, value)
+				}
+			}
+
+			// アサーション
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Load() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Load() = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
