@@ -25,9 +25,9 @@ func New(config *config.Config) (*Bot, error) {
 		config:  config,
 	}
 
-	// ハンドラーの登録
-	session.AddHandler(handler.NewPingHandler().Handle)
-	session.AddHandler(handler.NewHelpHandler().Handle)
+	// ルーターを初期化して登録
+	router := handler.NewRouter(config)
+	session.AddHandler(router.Handle)
 
 	return bot, nil
 }
