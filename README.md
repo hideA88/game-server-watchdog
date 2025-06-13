@@ -21,7 +21,7 @@
 
 1. 必要な依存関係のインストール:
 ```bash
-go mod download
+make deps
 ```
 
 2. 環境変数の設定:
@@ -31,14 +31,8 @@ go mod download
 
 3. ボットの実行:
 ```bash
-go run main.go
+make run
 ```
-
-## コマンド
-
-- `!status`: サーバーの現在の状態を表示
-- `!restart`: サーバーを再起動
-- `!metrics`: 詳細なリソース使用状況を表示
 
 ## 開発
 

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -9,36 +10,93 @@ import (
 	"github.com/hideA88/game-server-watchdog/internal/config"
 )
 
+type CommandHandler struct {
+	Cmd         command.Command
+	SendMsgFunc sendMessageFunc
+}
+
+type sendMessageFunc func(s *discordgo.Session, m *discordgo.MessageCreate, content string) (*discordgo.Message, error)
+
+func sendSimpleMessage(s *discordgo.Session, m *discordgo.MessageCreate, content string) (*discordgo.Message, error) {
+	return s.ChannelMessageSend(m.ChannelID, content)
+}
 
 // Router はメッセージをルーティングして適切なコマンドに振り分ける
 type Router struct {
 	config   *config.Config
-	commands map[string]command.Command
+	commands map[string]*CommandHandler
 }
+
 
 // NewRouter は新しいルーターを作成し、コマンドを登録
 func NewRouter(cfg *config.Config) *Router {
 	r := &Router{
 		config:   cfg,
-		commands: make(map[string]command.Command),
+		commands: make(map[string]*CommandHandler),
 	}
 
 	// コマンドを初期化して登録
 	pingCmd := command.NewPingCommand()
 	helpCmd := command.NewHelpCommand()
-	
-	r.RegisterCommand(pingCmd)
-	r.RegisterCommand(helpCmd)
-	
+
+	r.RegisterCommand(pingCmd, sendSimpleMessage)
+	r.RegisterCommand(helpCmd, sendSimpleMessage)
+
 	// helpコマンドに利用可能なコマンドを設定
-	helpCmd.SetCommands(r.commands)
+	commands := []command.Command{pingCmd, helpCmd}
+	helpCmd.SetCommands(commands)
 
 	return r
 }
 
 // RegisterCommand はコマンドを登録
-func (r *Router) RegisterCommand(cmd command.Command) {
-	r.commands[cmd.Name()] = cmd
+func (r *Router) RegisterCommand(cmd command.Command, sendMsgFunc sendMessageFunc) {
+	r.commands[cmd.Name()] = &CommandHandler{
+		Cmd:         cmd,
+		SendMsgFunc: sendMsgFunc,
+	}
+}
+
+// ParseCommand はメッセージからメンションを削除してコマンドと引数を抽出
+func ParseCommand(content string, mentions []string) (string, []string) {
+	// メンション部分を削除
+	cleanContent := strings.TrimSpace(content)
+	for _, userID := range mentions {
+		mention := "<@" + userID + ">"
+		cleanContent = strings.ReplaceAll(cleanContent, mention, "")
+		mention = "<@!" + userID + ">"
+		cleanContent = strings.ReplaceAll(cleanContent, mention, "")
+	}
+	cleanContent = strings.TrimSpace(cleanContent)
+
+	// コマンドと引数を分割
+	parts := strings.Fields(cleanContent)
+	if len(parts) == 0 {
+		return "", nil
+	}
+
+	command := strings.ToLower(parts[0])
+	args := parts[1:]
+	return command, args
+}
+
+// CheckMention はメッセージ内に特定のユーザーがメンションされているかチェック
+func CheckMention(mentions []string, targetUserID string) bool {
+	for _, userID := range mentions {
+		if userID == targetUserID {
+			return true
+		}
+	}
+	return false
+}
+
+// ExecuteCommand はコマンドを実行して結果を返す
+func (r *Router) ExecuteCommand(commandName string, args []string) (string, error) {
+	handler, exists := r.commands[commandName]
+	if !exists {
+		return "", fmt.Errorf("不明なコマンドです。`@ボット help`でコマンド一覧を確認してください。")
+	}
+	return handler.Cmd.Execute(args)
 }
 
 // Handle はDiscordのメッセージイベントを処理
@@ -48,17 +106,14 @@ func (r *Router) Handle(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	// ボットがメンションされているかチェック
-	botMentioned := false
-	for _, user := range m.Mentions {
-		if user.ID == s.State.User.ID {
-			botMentioned = true
-			break
-		}
+	// メンションされたユーザーのIDリストを作成
+	mentionIDs := make([]string, len(m.Mentions))
+	for i, user := range m.Mentions {
+		mentionIDs[i] = user.ID
 	}
 
-	// メンションされていない場合は無視
-	if !botMentioned {
+	// ボットがメンションされているかチェック
+	if !CheckMention(mentionIDs, s.State.User.ID) {
 		return
 	}
 
@@ -68,36 +123,25 @@ func (r *Router) Handle(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	// メンション部分を削除してコマンドを取得
-	content := strings.TrimSpace(m.Content)
-	for _, user := range m.Mentions {
-		mention := "<@" + user.ID + ">"
-		content = strings.ReplaceAll(content, mention, "")
-		mention = "<@!" + user.ID + ">"
-		content = strings.ReplaceAll(content, mention, "")
-	}
-	content = strings.TrimSpace(content)
-
-	// コマンドと引数を分割
-	parts := strings.Fields(content)
-	if len(parts) == 0 {
+	// コマンドをパース
+	command, args := ParseCommand(m.Content, mentionIDs)
+	if command == "" {
 		return
 	}
 
-	command := strings.ToLower(parts[0])
-	args := parts[1:]
+	// コマンドを実行
+	result, err := r.ExecuteCommand(command, args)
+	if err != nil {
+		log.Printf("コマンド実行エラー: %v", err)
+		_, _ = s.ChannelMessageSend(m.ChannelID, err.Error())
+		return
+	}
 
-	// コマンドを探して実行
-	if cmd, exists := r.commands[command]; exists {
-		if err := cmd.Execute(s, m, args); err != nil {
-			log.Printf("コマンド実行エラー: %v", err)
-			_, _ = s.ChannelMessageSend(m.ChannelID, "コマンドの実行中にエラーが発生しました。")
-		}
-	} else {
-		// 未知のコマンドの場合
-		_, err := s.ChannelMessageSend(m.ChannelID, "不明なコマンドです。`@ボット help`でコマンド一覧を確認してください。")
-		if err != nil {
+	// 結果を送信
+	if handler, exists := r.commands[command]; exists {
+		if _, err := handler.SendMsgFunc(s, m, result); err != nil {
 			log.Printf("メッセージの送信に失敗しました: %v", err)
+			_, _ = s.ChannelMessageSend(m.ChannelID, "メッセージの送信中にエラーが発生しました。")
 		}
 	}
 }

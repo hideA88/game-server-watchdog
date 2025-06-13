@@ -24,6 +24,10 @@ test-coverage: ## Run tests with coverage report
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out
 
+.PHONY: test-short
+test-short: ## Run short tests
+	go test -short ./...
+
 .PHONY: clean
 clean: ## Remove build artifacts
 	rm -rf bin/

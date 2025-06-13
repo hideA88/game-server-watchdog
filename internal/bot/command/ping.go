@@ -1,9 +1,5 @@
 package command
 
-import (
-	"github.com/bwmarrin/discordgo"
-)
-
 // PingCommand はpingコマンドの実装
 type PingCommand struct{}
 
@@ -23,7 +19,6 @@ func (c *PingCommand) Description() string {
 }
 
 // Execute はコマンドを実行する
-func (c *PingCommand) Execute(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	_, err := s.ChannelMessageSend(m.ChannelID, "pong!!")
-	return err
+func (c *PingCommand) Execute(_ []string) (string, error) {
+	return "pong!!", nil
 }

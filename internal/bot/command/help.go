@@ -2,18 +2,17 @@ package command
 
 import (
 	"fmt"
-	"github.com/bwmarrin/discordgo"
 )
 
 // HelpCommand はhelpコマンドの実装
 type HelpCommand struct {
-	commands map[string]Command
+	commands []Command
 }
 
 // NewHelpCommand は新しいHelpCommandを作成
 func NewHelpCommand() *HelpCommand {
 	return &HelpCommand{
-		commands: make(map[string]Command),
+		commands: []Command{},
 	}
 }
 
@@ -28,20 +27,19 @@ func (c *HelpCommand) Description() string {
 }
 
 // SetCommands は利用可能なコマンドのリストを設定
-func (c *HelpCommand) SetCommands(commands map[string]Command) {
+func (c *HelpCommand) SetCommands(commands []Command) {
 	c.commands = commands
 }
 
 // Execute はコマンドを実行する
-func (c *HelpCommand) Execute(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func (c *HelpCommand) Execute(args []string) (string, error) {
 	helpMessage := "**利用可能なコマンド:**\n"
-	
-	for name, cmd := range c.commands {
-		helpMessage += fmt.Sprintf("`@ボット %s` - %s\n", name, cmd.Description())
+
+	for _, cmd := range c.commands {
+		helpMessage += fmt.Sprintf("`@ボット %s` - %s\n", cmd.Name(), cmd.Description())
 	}
-	
+
 	helpMessage += "\n**使い方:**\nボットをメンションしてコマンドを送信してください。"
 
-	_, err := s.ChannelMessageSend(m.ChannelID, helpMessage)
-	return err
+	return helpMessage, nil
 }

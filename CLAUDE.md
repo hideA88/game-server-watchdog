@@ -28,12 +28,62 @@
 
 ### コマンド実行
 - `make lint`: コードのlintチェック
+- `make test`: 全テストを実行
+- `make test-coverage`: カバレッジ付きでテスト実行
 - `go run cmd/watchdog/main.go`: ボット起動
 
 ### 新しいハンドラー追加時
 1. `internal/bot/handler/`に新しいハンドラーファイルを作成
 2. `handler.NewHandlers()`に追加
 3. メンションチェックを必ず実装
+
+### テストの書き方
+
+**必ずテーブル駆動テスト（Table-Driven Tests）で実装すること**
+
+```go
+func TestFunctionName(t *testing.T) {
+    tests := []struct {
+        name string
+        // 入力パラメータ
+        input string
+        // 期待値
+        want string
+        wantErr bool
+    }{
+        {
+            name: "正常系のケース",
+            input: "test",
+            want: "expected",
+            wantErr: false,
+        },
+        {
+            name: "異常系のケース",
+            input: "",
+            want: "",
+            wantErr: true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // テスト実行
+            got, err := FunctionName(tt.input)
+            
+            // エラーチェック
+            if (err != nil) != tt.wantErr {
+                t.Errorf("FunctionName() error = %v, wantErr %v", err, tt.wantErr)
+                return
+            }
+            
+            // 結果チェック
+            if got != tt.want {
+                t.Errorf("FunctionName() = %v, want %v", got, tt.want)
+            }
+        })
+    }
+}
+```
 
 ### セキュリティ
 - Discord tokenは絶対にコミットしない
