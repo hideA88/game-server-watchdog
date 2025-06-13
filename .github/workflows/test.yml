@@ -23,6 +23,14 @@ jobs:
     - name: Run tests with coverage
       run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
+    - name: Check if CODECOV_TOKEN is set
+      run: |
+        if [ -z "${{ secrets.CODECOV_TOKEN }}" ]; then
+          echo "CODECOV_TOKEN is not set"
+        else
+          echo "CODECOV_TOKEN is set"
+        fi
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
@@ -30,4 +38,4 @@ jobs:
         file: ./coverage.out
         flags: unittests
         name: codecov-umbrella
-        fail_ci_if_error: true
+        fail_ci_if_error: false
