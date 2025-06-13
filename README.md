@@ -1,5 +1,8 @@
 # Game Server Watchdog
 
+[![codecov](https://codecov.io/gh/hideA88/game-server-watchdog/branch/main/graph/badge.svg)](https://codecov.io/gh/hideA88/game-server-watchdog)
+[![Test and Coverage](https://github.com/hideA88/game-server-watchdog/actions/workflows/test.yml/badge.svg)](https://github.com/hideA88/game-server-watchdog/actions/workflows/test.yml)
+
 ゲームサーバーの監視と管理を行うDiscordボットです。
 
 ## 機能
