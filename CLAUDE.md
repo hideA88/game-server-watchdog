@@ -14,6 +14,7 @@
 - `DISCORD_TOKEN`: Discord botトークン（必須）
 - `ALLOWED_CHANNEL_IDS`: 許可されたチャンネルID（カンマ区切り）
 - `ALLOWED_USER_IDS`: 許可されたユーザーID（カンマ区切り）
+- `DOCKER_COMPOSE_PATH`: docker-compose.ymlのパス（デフォルト: docker-compose.yml）
 
 ### アクセス制限
 - 特定のチャンネルIDのみでボットが反応するよう制限済み
@@ -24,13 +25,17 @@
 - `@bot ping`: 応答確認（pong!!を返す）
 - `@bot help`: ヘルプメッセージを表示
 - `@bot status`: サーバーのCPU使用率、メモリ使用量、ディスク空き容量を表示
+- `@bot game-info`: Docker Composeで管理されているゲームサーバーの稼働状況を表示
 
 ## 開発時の注意事項
 
 ### コード品質管理
 **コードの修正や追加を行った際は、必ず以下のコマンドを実行してください：**
 1. `make format`: コードのフォーマット
-2. `make lint`: lintチェック（エラーが出た場合は必ず修正）
+2. `make test`: テストを実行（エラーが出た場合は必ず修正）
+3. `make lint`: lintチェック（エラーが出た場合は必ず修正）
+
+**重要**: コード修正後は必ず`make test`を実行し、全てのテストが通ることを確認してください。テストエラーが発生した場合は、必ず修正してからコミットしてください。
 
 ### コマンド実行
 - `make format`: コードのフォーマット（goimports + go fmt）
