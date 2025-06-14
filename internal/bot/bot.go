@@ -5,8 +5,9 @@ import (
 	"log"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/hideA88/game-server-watchdog/config"
 	"github.com/hideA88/game-server-watchdog/internal/bot/handler"
-	"github.com/hideA88/game-server-watchdog/internal/config"
+	"github.com/hideA88/game-server-watchdog/pkg/docker"
 	"github.com/hideA88/game-server-watchdog/pkg/system"
 )
 
@@ -15,7 +16,7 @@ type Bot struct {
 	config  *config.Config
 }
 
-func New(config *config.Config, monitor system.Monitor) (*Bot, error) {
+func New(config *config.Config, monitor system.Monitor, compose docker.ComposeService) (*Bot, error) {
 	session, err := discordgo.New("Bot " + config.DiscordToken)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Discord session: %w", err)
@@ -27,7 +28,7 @@ func New(config *config.Config, monitor system.Monitor) (*Bot, error) {
 	}
 
 	// ルーターを初期化して登録
-	router := handler.NewRouter(config, monitor)
+	router := handler.NewRouter(config, monitor, compose)
 	session.AddHandler(router.Handle)
 
 	return bot, nil

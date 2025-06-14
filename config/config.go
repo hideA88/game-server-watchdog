@@ -10,6 +10,7 @@ type Config struct {
 	DebugMode         bool     `envconfig:"DEBUG_MODE" default:"false"`
 	AllowedChannelIDs []string `envconfig:"ALLOWED_CHANNEL_IDS" separator:","`
 	AllowedUserIDs    []string `envconfig:"ALLOWED_USER_IDS" separator:","`
+	DockerComposePath string   `envconfig:"DOCKER_COMPOSE_PATH" default:"docker-compose.yml"`
 }
 
 func Load() (*Config, error) {

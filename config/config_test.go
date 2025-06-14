@@ -7,6 +7,17 @@ import (
 )
 
 func TestLoad(t *testing.T) {
+	// Temporarily rename .env file if it exists
+	if _, err := os.Stat(".env"); err == nil {
+		if err := os.Rename(".env", ".env.test.bak"); err != nil {
+			t.Fatalf("Failed to rename .env file: %v", err)
+		}
+		defer func() {
+			if err := os.Rename(".env.test.bak", ".env"); err != nil {
+				t.Errorf("Failed to restore .env file: %v", err)
+			}
+		}()
+	}
 	tests := []struct {
 		name        string
 		envVars     map[string]string
@@ -28,6 +39,7 @@ func TestLoad(t *testing.T) {
 				DebugMode:         true,
 				AllowedChannelIDs: []string{"123", "456", "789"},
 				AllowedUserIDs:    []string{"111", "222", "333"},
+				DockerComposePath: "docker-compose.yml",
 			},
 			wantErr: false,
 		},
@@ -41,6 +53,7 @@ func TestLoad(t *testing.T) {
 				DebugMode:         false,
 				AllowedChannelIDs: nil,
 				AllowedUserIDs:    nil,
+				DockerComposePath: "docker-compose.yml",
 			},
 			wantErr: false,
 		},
@@ -65,6 +78,7 @@ func TestLoad(t *testing.T) {
 				DebugMode:         false,
 				AllowedChannelIDs: []string{},
 				AllowedUserIDs:    []string{},
+				DockerComposePath: "docker-compose.yml",
 			},
 			wantErr: false,
 		},
@@ -78,6 +92,7 @@ func TestLoad(t *testing.T) {
 				DebugMode:         false,
 				AllowedChannelIDs: nil,
 				AllowedUserIDs:    nil,
+				DockerComposePath: "docker-compose.yml",
 			},
 			wantErr: false,
 			setupFunc: func() {
@@ -97,8 +112,10 @@ func TestLoad(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// 既存の環境変数を保存
 			originalEnv := make(map[string]string)
-			for key := range tt.envVars {
+			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS", "DOCKER_COMPOSE_PATH"}
+			for _, key := range envKeys {
 				originalEnv[key] = os.Getenv(key)
+				os.Unsetenv(key)
 			}
 
 			// setup
@@ -166,6 +183,18 @@ func createTestEnvFile(t *testing.T, content string) func() {
 }
 
 func TestLoad_WithEnvFile(t *testing.T) {
+	// 既存の.envファイルを一時的にリネーム
+	if _, err := os.Stat(".env"); err == nil {
+		if err := os.Rename(".env", ".env.test.bak"); err != nil {
+			t.Fatalf("Failed to rename .env file: %v", err)
+		}
+		defer func() {
+			if err := os.Rename(".env.test.bak", ".env"); err != nil {
+				t.Errorf("Failed to restore .env file: %v", err)
+			}
+		}()
+	}
+
 	tests := []struct {
 		name    string
 		envFile string
@@ -183,6 +212,7 @@ ALLOWED_USER_IDS=333,444`,
 				DebugMode:         true,
 				AllowedChannelIDs: []string{"111", "222"},
 				AllowedUserIDs:    []string{"333", "444"},
+				DockerComposePath: "docker-compose.yml",
 			},
 			wantErr: false,
 		},
@@ -191,7 +221,7 @@ ALLOWED_USER_IDS=333,444`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 環境変数をクリア
-			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS"}
+			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS", "DOCKER_COMPOSE_PATH"}
 			originalEnv := make(map[string]string)
 			for _, key := range envKeys {
 				originalEnv[key] = os.Getenv(key)

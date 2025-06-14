@@ -6,8 +6,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/hideA88/game-server-watchdog/config"
 	"github.com/hideA88/game-server-watchdog/internal/bot"
-	"github.com/hideA88/game-server-watchdog/internal/config"
+	"github.com/hideA88/game-server-watchdog/pkg/docker"
 	"github.com/hideA88/game-server-watchdog/pkg/system"
 )
 
@@ -18,11 +19,12 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	//
+	// 依存性の初期化
 	monitor := system.NewDefaultMonitor()
+	compose := docker.NewDefaultComposeService()
 
 	// ボットの初期化
-	discordBot, err := bot.New(cfg, monitor)
+	discordBot, err := bot.New(cfg, monitor, compose)
 	if err != nil {
 		log.Fatalf("Error creating bot: %v", err)
 	}

@@ -6,8 +6,9 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/hideA88/game-server-watchdog/config"
 	"github.com/hideA88/game-server-watchdog/internal/bot/command"
-	"github.com/hideA88/game-server-watchdog/internal/config"
+	"github.com/hideA88/game-server-watchdog/pkg/docker"
 	"github.com/hideA88/game-server-watchdog/pkg/system"
 )
 
@@ -29,7 +30,7 @@ type Router struct {
 }
 
 // NewRouter は新しいルーターを作成し、コマンドを登録
-func NewRouter(cfg *config.Config, monitor system.Monitor) *Router {
+func NewRouter(cfg *config.Config, monitor system.Monitor, compose docker.ComposeService) *Router {
 	r := &Router{
 		config:   cfg,
 		commands: make(map[string]*CommandHandler),
@@ -39,13 +40,15 @@ func NewRouter(cfg *config.Config, monitor system.Monitor) *Router {
 	pingCmd := command.NewPingCommand()
 	helpCmd := command.NewHelpCommand()
 	statusCmd := command.NewStatusCommand(monitor)
+	gameInfoCmd := command.NewGameInfoCommand(compose, cfg.DockerComposePath)
 
 	r.RegisterCommand(pingCmd, sendSimpleMessage)
 	r.RegisterCommand(helpCmd, sendSimpleMessage)
 	r.RegisterCommand(statusCmd, sendSimpleMessage)
+	r.RegisterCommand(gameInfoCmd, sendSimpleMessage)
 
 	// helpコマンドに利用可能なコマンドを設定
-	commands := []command.Command{pingCmd, helpCmd, statusCmd}
+	commands := []command.Command{pingCmd, helpCmd, statusCmd, gameInfoCmd}
 	helpCmd.SetCommands(commands)
 
 	return r

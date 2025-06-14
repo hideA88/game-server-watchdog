@@ -3,7 +3,7 @@ package handler
 import (
 	"testing"
 
-	"github.com/hideA88/game-server-watchdog/internal/config"
+	"github.com/hideA88/game-server-watchdog/config"
 )
 
 func TestIsAuthorized(t *testing.T) {

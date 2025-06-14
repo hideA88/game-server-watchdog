@@ -4,8 +4,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/hideA88/game-server-watchdog/config"
 	"github.com/hideA88/game-server-watchdog/internal/bot/command"
-	"github.com/hideA88/game-server-watchdog/internal/config"
+	"github.com/hideA88/game-server-watchdog/pkg/docker"
 	"github.com/hideA88/game-server-watchdog/pkg/system"
 )
 
@@ -23,15 +24,16 @@ func TestNewRouter(t *testing.T) {
 				AllowedChannelIDs: []string{},
 				AllowedUserIDs:    []string{},
 			},
-			wantCommands:     []string{"ping", "help", "status"},
-			wantCommandCount: 3,
+			wantCommands:     []string{"ping", "help", "status", "game-info"},
+			wantCommandCount: 4,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMonitor := &system.MockMonitor{}
-			router := NewRouter(tt.config, mockMonitor)
+			mockCompose := &docker.MockComposeService{}
+			router := NewRouter(tt.config, mockMonitor, mockCompose)
 
 			// ルーターが正しく初期化されているか確認
 			if router == nil {
@@ -275,7 +277,8 @@ func TestRouter_ExecuteCommand(t *testing.T) {
 					DiskUsedPercent:   50.0,
 				},
 			}
-			router := NewRouter(&config.Config{}, mockMonitor)
+			mockCompose := &docker.MockComposeService{}
+			router := NewRouter(&config.Config{}, mockMonitor, mockCompose)
 
 			gotResult, err := router.ExecuteCommand(tt.commandName, tt.args)
 

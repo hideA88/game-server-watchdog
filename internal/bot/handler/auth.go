@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/hideA88/game-server-watchdog/internal/config"
+	"github.com/hideA88/game-server-watchdog/config"
 )
 
 // IsAuthorized はユーザーがボットにアクセスする権限があるかチェック
