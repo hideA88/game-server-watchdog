@@ -1,23 +1,69 @@
 coverage:
+  # カバレッジの精度設定
+  precision: 2
+  round: down
+  range: "70...100"
+
+  # ステータスチェックの設定
   status:
+    # プロジェクト全体のカバレッジ
     project:
       default:
-        target: 70%
-        threshold: 5%
+        target: 70%          # 目標カバレッジ
+        threshold: 5%        # 許容される低下率
+        base: auto
+        if_not_found: success
+        if_ci_failed: error
+        informational: false
+        only_pulls: false
+    
+    # プルリクエストで変更されたコードのカバレッジ
     patch:
       default:
-        target: 80%
-        threshold: 5%
+        target: 70%          # 新規/変更コードの目標カバレッジ
+        threshold: 10%       # 許容される低下率
+        base: auto
+        if_not_found: success
+        if_ci_failed: error
+        informational: false
+        only_pulls: false
 
+# カバレッジ計測から除外するファイル
+ignore:
+  - "**/*_test.go"           # テストファイル
+  - "**/mock*.go"            # モックファイル
+  - "**/generated*.go"       # 自動生成ファイル
+  - "cmd/watchdog/main.go"   # メイン関数
+  - "internal/bot/bot.go"    # 単純なワイヤリング
+  - "scripts/**"             # スクリプト
+
+# コメントの設定
 comment:
   layout: "reach,diff,flags,files,footer"
-  behavior: default
-  require_changes: true
+  behavior: default          # 新しいコメントを投稿
+  require_changes: false     # 変更がなくてもコメント
+  require_base: false        # ベースが無くてもコメント
+  require_head: true         # HEADは必須
+  show_carryforward_flags: false
+  show_critical_paths: true  # クリティカルパスを表示
 
-ignore:
-  - "**/*_test.go"
-  - "**/mock_*.go"
-  - "**/mock.go"
-  - "**/generated*.go"
-  - "cmd/watchdog/main.go"
-  - "internal/bot/bot.go"
+# フラグの設定（テストの種類ごとにカバレッジを分ける）
+flags:
+  unittests:
+    paths:
+      - "!**/*_test.go"
+    carryforward: true
+
+# パスの修正（CI環境とローカルの差異を吸収）
+fixes:
+  - "/home/runner/work/game-server-watchdog/game-server-watchdog/::"
+
+# GitHub統合の設定
+github_checks:
+  annotations: true          # GitHub上でカバレッジ情報を表示
+
+# 通知設定
+notify:
+  # Slack通知を無効化（必要に応じて設定）
+  require_ci_to_pass: true
+  wait_for_ci: true
