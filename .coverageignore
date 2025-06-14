@@ -1,4 +1,5 @@
 cmd/watchdog/main.go
 internal/bot/bot.go
 **/mock_*.go
+**/mock.go
 **/generated*.go
