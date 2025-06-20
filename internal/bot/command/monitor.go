@@ -1,29 +1,52 @@
 package command
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
+	"github.com/hideA88/game-server-watchdog/pkg/logging"
 	"github.com/hideA88/game-server-watchdog/pkg/system"
+	"golang.org/x/sync/errgroup"
+)
+
+const (
+	// アラート閾値
+	CPUAlertThreshold    = 85.0
+	MemoryAlertThreshold = 90.0
+	DiskAlertThreshold   = 90.0
+
+	// Discord制限
+	DiscordMessageLimit = 2000
+
+	// タイムアウト
+	ServiceOperationTimeout = 60 * time.Second
 )
 
 // MonitorCommand handles the monitor command
 type MonitorCommand struct {
-	compose     docker.ComposeService
-	monitor     system.Monitor
-	composePath string
+	compose           docker.ComposeService
+	monitor           system.Monitor
+	composePath       string
+	serviceOperations *sync.Map // サービス名をキーとした操作ロック
+	ctx               context.Context
 }
 
 // NewMonitorCommand creates a new MonitorCommand
-func NewMonitorCommand(compose docker.ComposeService, monitor system.Monitor, composePath string) *MonitorCommand {
+func NewMonitorCommand(ctx context.Context, compose docker.ComposeService, monitor system.Monitor, composePath string) *MonitorCommand {
 	if composePath == "" {
 		composePath = "docker-compose.yml"
 	}
 	return &MonitorCommand{
-		compose:     compose,
-		monitor:     monitor,
-		composePath: composePath,
+		compose:           compose,
+		monitor:           monitor,
+		composePath:       composePath,
+		serviceOperations: &sync.Map{},
+		ctx:               ctx,
 	}
 }
 
@@ -34,175 +57,417 @@ func (c *MonitorCommand) Name() string {
 
 // Description returns the command description
 func (c *MonitorCommand) Description() string {
-	return "システムとコンテナのリアルタイム監視ダッシュボードを表示"
+	return "システムとゲームサーバーの監視情報を表示（操作ボタン付き）"
 }
 
 // Execute runs the command
 func (c *MonitorCommand) Execute(args []string) (string, error) {
-	var builder strings.Builder
-	builder.WriteString("🖥️ **システム監視ダッシュボード**\n\n")
-
-	// ホストシステム情報を取得
-	sysInfo, err := c.monitor.GetSystemInfo()
+	// データ収集
+	data, err := c.collectMonitorData()
 	if err != nil {
-		builder.WriteString("⚠️ システム情報の取得に失敗しました\n")
-	} else {
-		builder.WriteString("📊 **ホストサーバー**\n")
-
-		// CPU使用率
-		cpuBar := createProgressBar(sysInfo.CPUUsagePercent, 10)
-		builder.WriteString(fmt.Sprintf("CPU: %s %.1f%%\n", cpuBar, sysInfo.CPUUsagePercent))
-
-		// メモリ使用率
-		memBar := createProgressBar(sysInfo.MemoryUsedPercent, 10)
-		builder.WriteString(fmt.Sprintf("MEM: %s %.1f%% (%.1fGB/%.1fGB)\n",
-			memBar, sysInfo.MemoryUsedPercent, sysInfo.MemoryUsedGB, sysInfo.MemoryTotalGB))
-
-		// ディスク使用率
-		diskBar := createProgressBar(sysInfo.DiskUsedPercent, 10)
-		builder.WriteString(fmt.Sprintf("DISK: %s %.1f%% (%.1fGB free)\n",
-			diskBar, sysInfo.DiskUsedPercent, sysInfo.DiskFreeGB))
+		return "", fmt.Errorf("監視データの収集に失敗しました: %w", err)
 	}
 
-	builder.WriteString("\n📦 **コンテナ状況**\n")
-	builder.WriteString("```\n")
-	builder.WriteString("┌─────────────────┬────────┬────────┬────────┬────────┐\n")
-	builder.WriteString("│ サービス         │ 状態   │ CPU    │ メモリ │ 稼働   │\n")
-	builder.WriteString("├─────────────────┼────────┼────────┼────────┼────────┤\n")
+	// レポート生成
+	report := c.buildMonitorReport(data)
 
-	// コンテナ情報を取得
-	containers, err := c.compose.ListContainers(c.composePath)
-	if err != nil {
-		builder.WriteString("│ エラー: コンテナ情報の取得に失敗しました         │\n")
-	} else {
-		// コンテナの統計情報を取得
-		stats, _ := c.compose.GetAllContainersStats(c.composePath)
-		statsMap := make(map[string]*docker.ContainerStats)
-		for i := range stats {
-			statsMap[stats[i].Name] = &stats[i]
-		}
-
-		for _, container := range containers {
-			// サービス名（最大17文字）
-			serviceName := container.Service
-			if len(serviceName) > 15 {
-				serviceName = serviceName[:15] + ".."
-			}
-			serviceName = fmt.Sprintf("%-17s", serviceName)
-
-			// 状態アイコン
-			var stateIcon string
-			switch strings.ToLower(container.State) {
-			case "running":
-				stateIcon = "🟢"
-			case "stopped", "exited":
-				stateIcon = "🔴"
-			case "restarting":
-				stateIcon = "🟡"
-			default:
-				stateIcon = "❓"
-			}
-			state := fmt.Sprintf("%-8s", stateIcon)
-
-			// リソース使用状況
-			var cpu, memory string
-			if stat, ok := statsMap[container.Name]; ok {
-				cpu = fmt.Sprintf("%6.1f%%", stat.CPUPercent)
-				// メモリ使用量から数値を抽出
-				memParts := strings.Split(stat.MemoryUsage, " / ")
-				if len(memParts) > 0 {
-					memory = fmt.Sprintf("%-8s", memParts[0])
-				} else {
-					memory = fmt.Sprintf("%-8s", "-")
-				}
-			} else {
-				cpu = fmt.Sprintf("%-8s", "-")
-				memory = fmt.Sprintf("%-8s", "-")
-			}
-
-			// 稼働時間
-			runningFor := container.RunningFor
-			if runningFor == "" {
-				runningFor = "-"
-			}
-			if len(runningFor) > 8 {
-				runningFor = runningFor[:7] + "."
-			}
-			runningFor = fmt.Sprintf("%-8s", runningFor)
-
-			builder.WriteString(fmt.Sprintf("│%s│%s│%s│%s│%s│\n",
-				serviceName, state, cpu, memory, runningFor))
-		}
+	// メッセージ長チェック
+	if len(report) > DiscordMessageLimit {
+		return c.buildSummaryMessage(data), nil
 	}
 
-	builder.WriteString("└─────────────────┴────────┴────────┴────────┴────────┘\n")
-	builder.WriteString("```\n")
-
-	// アラート情報を追加
-	builder.WriteString("\n⚠️ **アラート**\n")
-	alertCount := 0
-
-	// CPU使用率が高いコンテナをチェック
-	if stats, err := c.compose.GetAllContainersStats(c.composePath); err == nil {
-		for _, stat := range stats {
-			if stat.CPUPercent > 85.0 {
-				builder.WriteString(fmt.Sprintf("- %s: CPU使用率が高い (%.1f%%)\n",
-					FormatServiceName(getServiceFromContainerName(stat.Name)), stat.CPUPercent))
-				alertCount++
-			}
-			if stat.MemoryPercent > 90.0 {
-				builder.WriteString(fmt.Sprintf("- %s: メモリ使用率が高い (%.1f%%)\n",
-					FormatServiceName(getServiceFromContainerName(stat.Name)), stat.MemoryPercent))
-				alertCount++
-			}
-		}
-	}
-
-	// ホストシステムのアラート
-	if sysInfo != nil {
-		if sysInfo.CPUUsagePercent > 85.0 {
-			builder.WriteString(fmt.Sprintf("- ホストサーバー: CPU使用率が高い (%.1f%%)\n", sysInfo.CPUUsagePercent))
-			alertCount++
-		}
-		if sysInfo.MemoryUsedPercent > 90.0 {
-			builder.WriteString(fmt.Sprintf("- ホストサーバー: メモリ使用率が高い (%.1f%%)\n", sysInfo.MemoryUsedPercent))
-			alertCount++
-		}
-		if sysInfo.DiskUsedPercent > 90.0 {
-			builder.WriteString(fmt.Sprintf("- ホストサーバー: ディスク使用率が高い (%.1f%%)\n", sysInfo.DiskUsedPercent))
-			alertCount++
-		}
-	}
-
-	if alertCount == 0 {
-		builder.WriteString("- 現在アラートはありません\n")
-	}
-
-	return builder.String(), nil
+	return report, nil
 }
 
-// createProgressBar creates a text-based progress bar
-func createProgressBar(percent float64, width int) string {
-	if percent < 0 {
-		percent = 0
-	}
-	if percent > 100 {
-		percent = 100
+// collectMonitorData は監視データを収集する
+func (c *MonitorCommand) collectMonitorData() (*MonitorData, error) {
+	data := &MonitorData{}
+
+	// 1分のタイムアウトを設定
+	ctx, cancel := context.WithTimeout(c.ctx, 1*time.Minute)
+	defer cancel()
+
+	// コンテキスト付きのerrgroupを使用
+	g, ctx := errgroup.WithContext(ctx)
+
+	// システム情報を取得
+	g.Go(func() error {
+		select {
+		case <-ctx.Done():
+			data.SystemError = ctx.Err()
+			return nil
+		default:
+			data.SystemInfo, data.SystemError = c.monitor.GetSystemInfo()
+			return nil
+		}
+	})
+
+	// コンテナ情報と統計情報を取得
+	g.Go(func() error {
+		select {
+		case <-ctx.Done():
+			data.ContainerError = ctx.Err()
+			return nil
+		default:
+			// まずコンテナ情報を取得
+			data.Containers, data.ContainerError = c.compose.ListContainers(c.composePath)
+
+			// コンテナ情報が取得できた場合のみ統計情報を取得
+			if data.ContainerError == nil {
+				// コンテキストの確認
+				select {
+				case <-ctx.Done():
+					return nil
+				default:
+					data.Stats, data.StatsError = c.compose.GetAllContainersStats(c.composePath)
+					if data.StatsError != nil {
+						logger := logging.FromContext(c.ctx)
+						logger.Warn(c.ctx, "Failed to get container stats",
+							logging.ErrorField(data.StatsError))
+					}
+				}
+			}
+			return nil
+		}
+	})
+
+	// ゲームコンテナ情報を取得
+	g.Go(func() error {
+		select {
+		case <-ctx.Done():
+			data.GameError = ctx.Err()
+			return nil
+		default:
+			data.GameContainers, data.GameError = c.compose.ListGameContainers(c.composePath)
+			return nil
+		}
+	})
+
+	// すべての並行処理が完了するまで待機
+	_ = g.Wait() // エラーは個別に保存しているので無視
+
+	return data, nil
+}
+
+// buildMonitorReport は監視レポートを生成する
+func (c *MonitorCommand) buildMonitorReport(data *MonitorData) string {
+	var builder strings.Builder
+	builder.Grow(4096)
+	builder.WriteString("🖥️ **システム監視ダッシュボード**\n\n")
+
+	// システム情報
+	systemInfo := c.buildSystemInfo(data.SystemInfo)
+	builder.WriteString(systemInfo)
+
+	// コンテナテーブル
+	if data.ContainerError != nil {
+		builder.WriteString("\n⚠️ **コンテナ情報の取得に失敗しました**\n")
+		builder.WriteString(fmt.Sprintf("エラー: %v\n", data.ContainerError))
+	} else {
+		statsMap := make(map[string]*docker.ContainerStats)
+		for i := range data.Stats {
+			statsMap[data.Stats[i].Name] = &data.Stats[i]
+		}
+		containerTable := c.buildContainerTable(data.Containers, statsMap)
+		builder.WriteString(containerTable)
 	}
 
-	filled := int(percent * float64(width) / 100)
-	empty := width - filled
+	// アラート
+	alerts := c.checkAlerts(data.SystemInfo, data.Stats)
+	alertSection := c.buildAlertSection(alerts)
+	builder.WriteString(alertSection)
 
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", empty)
-	return bar
+	// ゲームサーバー情報
+	if data.GameError != nil {
+		builder.WriteString("\n⚠️ **ゲームサーバー情報の取得に失敗しました**\n")
+		builder.WriteString(fmt.Sprintf("エラー: %v\n", data.GameError))
+	} else {
+		gameServerInfo := c.buildGameServerInfo(data.GameContainers)
+		builder.WriteString(gameServerInfo)
+	}
+
+	return builder.String()
+}
+
+// GetGameIcon returns an icon based on the game service name
+func GetGameIcon(service string) string {
+	switch strings.ToLower(service) {
+	case "minecraft":
+		return "⛏️"
+	case "rust":
+		return "🔧"
+	case "terraria":
+		return "🌳"
+	case "valheim":
+		return "⚔️"
+	case "ark":
+		return "🦕"
+	default:
+		return "📦"
+	}
+}
+
+// GetStatusIcon returns an icon based on the container state
+func GetStatusIcon(state string) string {
+	switch strings.ToLower(state) {
+	case "running":
+		return "🟢"
+	case "stopped", "exited":
+		return "🔴"
+	case "restarting":
+		return "🟡"
+	case "paused":
+		return "⏸️"
+	default:
+		return "❓"
+	}
+}
+
+// FormatServiceName formats the service name for display
+func FormatServiceName(service string) string {
+	if service == "" {
+		return ""
+	}
+
+	// Replace hyphens and underscores with spaces
+	formatted := strings.ReplaceAll(service, "-", " ")
+	formatted = strings.ReplaceAll(formatted, "_", " ")
+
+	// Split into words and capitalize each
+	words := strings.Fields(formatted)
+	for i, word := range words {
+		if len(word) > 0 {
+			words[i] = strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
+		}
+	}
+
+	return strings.Join(words, " ")
+}
+
+// GetHealthIcon returns an icon based on the health status
+func GetHealthIcon(health string) string {
+	switch strings.ToLower(health) {
+	case "healthy":
+		return "✅"
+	case "unhealthy":
+		return "❌"
+	case "starting":
+		return "🔄"
+	default:
+		return "❓"
+	}
 }
 
 // getServiceFromContainerName extracts service name from container name
 func getServiceFromContainerName(containerName string) string {
 	// Docker Composeのコンテナ名は通常 "project_service_1" の形式
 	parts := strings.Split(containerName, "_")
-	if len(parts) >= 2 {
+	if len(parts) >= 2 && len(parts[1]) > 0 {
 		return parts[1]
 	}
 	return containerName
+}
+
+// GetComponents returns Discord message components for the monitor command
+func (c *MonitorCommand) GetComponents(args []string) ([]discordgo.MessageComponent, error) {
+	containers, err := c.compose.ListGameContainers(c.composePath)
+	if err != nil {
+		return nil, fmt.Errorf("コンテナ情報の取得に失敗しました: %w", err)
+	}
+
+	var components []discordgo.MessageComponent
+	var buttons []discordgo.MessageComponent
+
+	// ボタン数のカウント（最大値を超えないように）
+	buttonCount := 0
+	for _, container := range containers {
+		// 最大ボタン数に達したら終了
+		if buttonCount >= docker.MaxTotalButtons {
+			break
+		}
+		// 停止中のコンテナに対しては起動ボタンを追加
+		if strings.ToLower(container.State) == "stopped" || strings.ToLower(container.State) == "exited" {
+			button := discordgo.Button{
+				Label:    fmt.Sprintf("🚀 %s を起動", FormatServiceName(container.Service)),
+				Style:    discordgo.SuccessButton,
+				CustomID: fmt.Sprintf("start_service_%s", container.Service),
+			}
+			buttons = append(buttons, button)
+			buttonCount++
+		} else if strings.ToLower(container.State) == "running" {
+			// 稼働中のコンテナに対しては停止ボタンを追加
+			button := discordgo.Button{
+				Label:    fmt.Sprintf("🛑 %s を停止", FormatServiceName(container.Service)),
+				Style:    discordgo.DangerButton,
+				CustomID: fmt.Sprintf("stop_service_%s", container.Service),
+			}
+			buttons = append(buttons, button)
+			buttonCount++
+		}
+	}
+
+	// ボタンがある場合のみコンポーネントを返す
+	if len(buttons) > 0 {
+		// MaxButtonsPerRow個ずつのボタンをアクションローに分割
+		for i := 0; i < len(buttons); i += docker.MaxButtonsPerRow {
+			end := i + docker.MaxButtonsPerRow
+			if end > len(buttons) {
+				end = len(buttons)
+			}
+
+			row := discordgo.ActionsRow{
+				Components: buttons[i:end],
+			}
+			components = append(components, row)
+
+			// 最大MaxButtonRows行まで
+			if len(components) >= docker.MaxButtonRows {
+				break
+			}
+		}
+	}
+
+	return components, nil
+}
+
+// CanHandle は指定されたカスタムIDを処理できるかどうかを返す
+func (c *MonitorCommand) CanHandle(customID string) bool {
+	return strings.HasPrefix(customID, "start_service_") || strings.HasPrefix(customID, "stop_service_")
+}
+
+// HandleInteraction はサービスの起動/停止インタラクションを処理する
+func (c *MonitorCommand) HandleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	if i.Type != discordgo.InteractionMessageComponent {
+		return fmt.Errorf("unexpected interaction type: %v", i.Type)
+	}
+
+	data := i.MessageComponentData()
+
+	// サービス名と操作を判定
+	var serviceName string
+	var isStart bool
+
+	if strings.HasPrefix(data.CustomID, "start_service_") {
+		serviceName = strings.TrimPrefix(data.CustomID, "start_service_")
+		isStart = true
+	} else if strings.HasPrefix(data.CustomID, "stop_service_") {
+		serviceName = strings.TrimPrefix(data.CustomID, "stop_service_")
+		isStart = false
+	} else {
+		return fmt.Errorf("unknown custom ID: %s", data.CustomID)
+	}
+
+	// 操作ロックをチェック
+	if _, loaded := c.serviceOperations.LoadOrStore(serviceName, true); loaded {
+		return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: fmt.Sprintf("⚠️ %s は現在操作中です。しばらくお待ちください。", FormatServiceName(serviceName)),
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+	}
+
+	// Defer応答を送信（3秒以内）
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
+	if err != nil {
+		c.serviceOperations.Delete(serviceName)
+		return fmt.Errorf("failed to send defer response: %w", err)
+	}
+
+	// サービス操作処理を実行
+	go c.handleServiceOperation(s, i, serviceName, isStart)
+
+	return nil
+}
+
+// handleServiceOperation はサービスの起動/停止処理を行う
+func (c *MonitorCommand) handleServiceOperation(s *discordgo.Session, i *discordgo.InteractionCreate, serviceName string, isStart bool) {
+	logger := logging.FromContext(c.ctx)
+
+	// 処理完了時にロックを解放
+	defer c.serviceOperations.Delete(serviceName)
+
+	// 親コンテキストがキャンセルされた場合は早期終了
+	select {
+	case <-c.ctx.Done():
+		logger.Warn(c.ctx, "Parent context cancelled, aborting operation",
+			logging.String("service", serviceName))
+		return
+	default:
+	}
+
+	// タイムアウト付きコンテキストを作成
+	ctx, cancel := context.WithTimeout(c.ctx, ServiceOperationTimeout)
+	defer cancel()
+
+	// パニックリカバリー
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error(ctx, "Panic in handleServiceOperation",
+				logging.String("panic", fmt.Sprintf("%v", r)),
+				logging.String("service", serviceName),
+				logging.Bool("start", isStart))
+
+			// エラーメッセージを送信
+			_, _ = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+				Content: fmt.Sprintf("❌ 予期しないエラーが発生しました: %v", r),
+			})
+		}
+	}()
+
+	// サービス操作を実行
+	var err error
+	var successMessage string
+	var errorPrefix string
+
+	// タイムアウトチャンネルとの競合を処理
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if isStart {
+			err = c.compose.StartService(c.composePath, serviceName)
+			successMessage = fmt.Sprintf("✅ %s を起動しました！", FormatServiceName(serviceName))
+			errorPrefix = "起動"
+		} else {
+			err = c.compose.StopService(c.composePath, serviceName)
+			successMessage = fmt.Sprintf("🛑 %s を停止しました。", FormatServiceName(serviceName))
+			errorPrefix = "停止"
+		}
+	}()
+
+	// タイムアウトまたは完了を待つ
+	select {
+	case <-done:
+		// 正常完了
+	case <-ctx.Done():
+		// タイムアウト
+		err = fmt.Errorf("操作がタイムアウトしました (%v)", ServiceOperationTimeout)
+		errorPrefix = "操作"
+	}
+
+	// 結果に応じてメッセージを送信
+	var content string
+	if err != nil {
+		content = fmt.Sprintf("❌ %s の%sに失敗しました: %v", FormatServiceName(serviceName), errorPrefix, err)
+		logger.Error(c.ctx, "Service operation failed",
+			logging.String("service", serviceName),
+			logging.Bool("start", isStart),
+			logging.ErrorField(err))
+	} else {
+		content = successMessage
+		logger.Info(c.ctx, "Service operation succeeded",
+			logging.String("service", serviceName),
+			logging.Bool("start", isStart))
+	}
+
+	// フォローアップメッセージを送信
+	_, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+		Content: content,
+	})
+	if err != nil {
+		logger.Error(c.ctx, "Failed to send followup message", logging.ErrorField(err))
+	}
 }
