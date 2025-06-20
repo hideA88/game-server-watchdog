@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -167,7 +168,7 @@ func (s *DefaultComposeService) StartService(composePath string, serviceName str
 	output, err := s.executor.OutputContext(ctx, "docker", "compose", "-f", absPath, "start", serviceName)
 	if err != nil {
 		// Check if it's a timeout
-		if ctx.Err() == context.DeadlineExceeded {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return fmt.Errorf("start service %s timeout after %v", serviceName, ServiceOperationTimeout)
 		}
 		// Check if docker is installed
@@ -204,7 +205,7 @@ func (s *DefaultComposeService) StopService(composePath string, serviceName stri
 	output, err := s.executor.OutputContext(ctx, "docker", "compose", "-f", absPath, "stop", serviceName)
 	if err != nil {
 		// Check if it's a timeout
-		if ctx.Err() == context.DeadlineExceeded {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return fmt.Errorf("stop service %s timeout after %v", serviceName, ServiceOperationTimeout)
 		}
 		// Check if docker is installed

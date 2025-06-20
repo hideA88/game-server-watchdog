@@ -342,3 +342,199 @@ func TestRealCommandExecutor(t *testing.T) {
 		t.Errorf("Output(\"echo\", \"test\") = %v, want output containing \"test\"", string(output))
 	}
 }
+
+func TestDefaultComposeService_StartService(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		composePath  string
+		serviceName  string
+		mockExecutor *MockCommandExecutor
+		wantErr      bool
+		wantErrMsg   string
+	}{
+		{
+			name:        "successful service start",
+			composePath: "docker-compose.yml",
+			serviceName: "web",
+			mockExecutor: &MockCommandExecutor{
+				OutputContextFunc: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+					// Verify that the command has timeout
+					if _, ok := ctx.Deadline(); !ok {
+						t.Error("Context should have a deadline")
+					}
+					return []byte("Starting web... done"), nil
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:        "invalid service name",
+			composePath: "docker-compose.yml",
+			serviceName: "web;echo hack",
+			mockExecutor: &MockCommandExecutor{
+				OutputContextFunc: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+					return nil, nil
+				},
+			},
+			wantErr:    true,
+			wantErrMsg: "invalid service name",
+		},
+		{
+			name:        "empty service name",
+			composePath: "docker-compose.yml",
+			serviceName: "",
+			mockExecutor: &MockCommandExecutor{
+				OutputContextFunc: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+					return nil, nil
+				},
+			},
+			wantErr:    true,
+			wantErrMsg: "invalid service name",
+		},
+		{
+			name:        "docker command error",
+			composePath: "docker-compose.yml",
+			serviceName: "web",
+			mockExecutor: &MockCommandExecutor{
+				OutputContextFunc: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+					return nil, errors.New("service 'web' not found")
+				},
+			},
+			wantErr:    true,
+			wantErrMsg: "failed to start service",
+		},
+		{
+			name:        "context timeout",
+			composePath: "docker-compose.yml",
+			serviceName: "web",
+			mockExecutor: &MockCommandExecutor{
+				OutputContextFunc: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+					return nil, context.DeadlineExceeded
+				},
+			},
+			wantErr:    true,
+			wantErrMsg: "timeout",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &DefaultComposeService{
+				executor: tt.mockExecutor,
+			}
+
+			err := s.StartService(tt.composePath, tt.serviceName)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("StartService() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if err != nil && tt.wantErrMsg != "" {
+				if !strings.Contains(err.Error(), tt.wantErrMsg) {
+					t.Errorf("StartService() error = %v, want error containing %v", err, tt.wantErrMsg)
+				}
+			}
+		})
+	}
+}
+
+func TestDefaultComposeService_StopService(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		composePath  string
+		serviceName  string
+		mockExecutor *MockCommandExecutor
+		wantErr      bool
+		wantErrMsg   string
+	}{
+		{
+			name:        "successful service stop",
+			composePath: "docker-compose.yml",
+			serviceName: "web",
+			mockExecutor: &MockCommandExecutor{
+				OutputContextFunc: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+					// Verify that the command has timeout
+					if _, ok := ctx.Deadline(); !ok {
+						t.Error("Context should have a deadline")
+					}
+					return []byte("Stopping web... done"), nil
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:        "invalid service name",
+			composePath: "docker-compose.yml",
+			serviceName: "web|rm -rf /",
+			mockExecutor: &MockCommandExecutor{
+				OutputContextFunc: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+					return nil, nil
+				},
+			},
+			wantErr:    true,
+			wantErrMsg: "invalid service name",
+		},
+		{
+			name:        "empty service name",
+			composePath: "docker-compose.yml",
+			serviceName: "",
+			mockExecutor: &MockCommandExecutor{
+				OutputContextFunc: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+					return nil, nil
+				},
+			},
+			wantErr:    true,
+			wantErrMsg: "invalid service name",
+		},
+		{
+			name:        "docker command error",
+			composePath: "docker-compose.yml",
+			serviceName: "web",
+			mockExecutor: &MockCommandExecutor{
+				OutputContextFunc: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+					return nil, errors.New("service 'web' is not running")
+				},
+			},
+			wantErr:    true,
+			wantErrMsg: "failed to stop service",
+		},
+		{
+			name:        "context timeout",
+			composePath: "docker-compose.yml",
+			serviceName: "web",
+			mockExecutor: &MockCommandExecutor{
+				OutputContextFunc: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+					return nil, context.DeadlineExceeded
+				},
+			},
+			wantErr:    true,
+			wantErrMsg: "timeout",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &DefaultComposeService{
+				executor: tt.mockExecutor,
+			}
+
+			err := s.StopService(tt.composePath, tt.serviceName)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("StopService() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if err != nil && tt.wantErrMsg != "" {
+				if !strings.Contains(err.Error(), tt.wantErrMsg) {
+					t.Errorf("StopService() error = %v, want error containing %v", err, tt.wantErrMsg)
+				}
+			}
+		})
+	}
+}

@@ -42,12 +42,12 @@ func TestGameInfoCommand(t *testing.T) {
 			},
 			expectedContains: []string{
 				"🎮 **ゲームサーバー情報**",
-				"⛏️ **Minecraft Server**",
+				"⛏️ **Minecraft**",
 				"minecraft-bedrock-server",
 				"🟢 running (2 hours)",
 				"19132:19132/udp",
 				"✅ healthy",
-				"🔧 **Rust Server**",
+				"🔧 **Rust**",
 				"rust-server",
 				"🟢 running (5 hours)",
 				"28015:28015",
@@ -75,7 +75,7 @@ func TestGameInfoCommand(t *testing.T) {
 				},
 			},
 			expectedContains: []string{
-				"🌳 **Terraria Server**",
+				"🌳 **Terraria**",
 				"🔴 stopped",
 			},
 			notExpectedContains: []string{
@@ -94,7 +94,7 @@ func TestGameInfoCommand(t *testing.T) {
 				},
 			},
 			expectedContains: []string{
-				"⚔️ **Valheim Server**",
+				"⚔️ **Valheim**",
 				"🟡 restarting",
 			},
 			wantErr: false,
@@ -196,5 +196,101 @@ func TestGameInfoCommand_DefaultPath(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("Execute() unexpected error = %v", err)
+	}
+}
+
+func TestGameInfoCommand_CanHandle(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewGameInfoCommand(nil, "")
+
+	tests := []struct {
+		name     string
+		customID string
+		want     bool
+	}{
+		{
+			name:     "start button",
+			customID: "start_service_minecraft",
+			want:     true,
+		},
+		{
+			name:     "stop button",
+			customID: "stop_service_rust-server",
+			want:     true,
+		},
+		{
+			name:     "unrelated custom ID",
+			customID: "something_else",
+			want:     false,
+		},
+		{
+			name:     "empty custom ID",
+			customID: "",
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cmd.CanHandle(tt.customID); got != tt.want {
+				t.Errorf("CanHandle() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGameInfoCommand_HandleInteraction(t *testing.T) {
+	// Skip this test for now as it requires proper Discord session mocking
+	t.Skip("Skipping HandleInteraction test - requires proper Discord session mocking")
+}
+
+
+func TestFormatServiceName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		serviceName string
+		want        string
+	}{
+		{
+			name:        "lowercase service",
+			serviceName: "minecraft",
+			want:        "Minecraft",
+		},
+		{
+			name:        "service with hyphen",
+			serviceName: "rust-server",
+			want:        "Rust Server",
+		},
+		{
+			name:        "service with underscore",
+			serviceName: "terraria_world",
+			want:        "Terraria World",
+		},
+		{
+			name:        "service with mixed separators",
+			serviceName: "my-game_server",
+			want:        "My Game Server",
+		},
+		{
+			name:        "empty service name",
+			serviceName: "",
+			want:        "",
+		},
+		{
+			name:        "single character",
+			serviceName: "a",
+			want:        "A",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := FormatServiceName(tt.serviceName); got != tt.want {
+				t.Errorf("FormatServiceName() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

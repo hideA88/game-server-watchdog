@@ -137,25 +137,23 @@ func getHealthIcon(health string) string {
 
 // FormatServiceName formats the service name for display
 func FormatServiceName(service string) string {
-	// Capitalize and format common game names
-	switch strings.ToLower(service) {
-	case "minecraft":
-		return "Minecraft Server"
-	case "rust":
-		return "Rust Server"
-	case "terraria":
-		return "Terraria Server"
-	case "valheim":
-		return "Valheim Server"
-	case "ark":
-		return "ARK Server"
-	default:
-		// Capitalize first letter
-		if len(service) > 0 {
-			return strings.ToUpper(service[:1]) + service[1:]
-		}
-		return service
+	if service == "" {
+		return ""
 	}
+	
+	// Replace hyphens and underscores with spaces
+	formatted := strings.ReplaceAll(service, "-", " ")
+	formatted = strings.ReplaceAll(formatted, "_", " ")
+	
+	// Split into words and capitalize each
+	words := strings.Fields(formatted)
+	for i, word := range words {
+		if len(word) > 0 {
+			words[i] = strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
+		}
+	}
+	
+	return strings.Join(words, " ")
 }
 
 // GetComponents returns Discord message components for the game info command

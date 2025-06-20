@@ -13,10 +13,11 @@ import (
 func TestNewRouter(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name             string
-		config           *config.Config
-		wantCommands     []string
-		wantCommandCount int
+		name                    string
+		config                  *config.Config
+		wantCommands            []string
+		wantCommandCount        int
+		wantInteractionHandlers int
 	}{
 		{
 			name: "デフォルトコマンドが登録される",
@@ -24,8 +25,9 @@ func TestNewRouter(t *testing.T) {
 				AllowedChannelIDs: []string{},
 				AllowedUserIDs:    []string{},
 			},
-			wantCommands:     []string{"ping", "help", "status", "game-info"},
-			wantCommandCount: 4,
+			wantCommands:            []string{"ping", "help", "status", "game-info"},
+			wantCommandCount:        4,
+			wantInteractionHandlers: 1, // game-info command
 		},
 	}
 
@@ -54,6 +56,11 @@ func TestNewRouter(t *testing.T) {
 				if _, exists := router.commands[cmd]; !exists {
 					t.Errorf("%s command not registered", cmd)
 				}
+			}
+
+			// インタラクションハンドラー数の確認
+			if len(router.interactionHandlers) != tt.wantInteractionHandlers {
+				t.Errorf("Expected %d interaction handlers, got %d", tt.wantInteractionHandlers, len(router.interactionHandlers))
 			}
 		})
 	}
