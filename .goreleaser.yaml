@@ -1,0 +1,124 @@
+# .goreleaser.yaml
+# GoReleaserの設定ファイル
+# https://goreleaser.com/customization/
+
+project_name: game-server-watchdog
+
+before:
+  hooks:
+    # ビルド前にテストを実行
+    - go test -v ./...
+    - go mod tidy
+
+builds:
+  - id: watchdog
+    main: ./cmd/watchdog/main.go
+    binary: game-server-watchdog
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    # バージョン情報を埋め込む
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+      - -X main.builtBy=goreleaser
+
+archives:
+  - id: default
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - .env.example
+      - CHANGELOG.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+  groups:
+    - title: 'New Features'
+      regexp: '^feat'
+    - title: 'Bug Fixes'
+      regexp: '^fix'
+    - title: 'Performance Improvements'
+      regexp: '^perf'
+    - title: 'Code Refactoring'
+      regexp: '^refactor'
+
+# GitHub Releasesの設定
+release:
+  github:
+    owner: hideA88
+    name: game-server-watchdog
+  
+  # リリースノートのヘッダー
+  header: |
+    ## Game Server Watchdog v{{ .Version }}
+    
+    ゲームサーバーを監視・管理するDiscord botの新しいリリースです。
+  
+  # リリースノートのフッター
+  footer: |
+    ---
+    **Full Changelog**: https://github.com/hideA88/game-server-watchdog/compare/{{ .PreviousTag }}...{{ .Tag }}
+    
+    ## インストール方法
+    
+    1. お使いのOSに対応したバイナリをダウンロード
+    2. 実行権限を付与: `chmod +x game-server-watchdog` (Linux/macOS)
+    3. `.env` ファイルを作成し、必要な環境変数を設定
+    4. 実行: `./game-server-watchdog`
+
+  # プレリリースの設定
+  prerelease: auto
+  
+  # ドラフトとして作成
+  draft: false
+
+# Dockerイメージの作成
+dockers:
+  - image_templates:
+      - "ghcr.io/hidea88/game-server-watchdog:{{ .Tag }}"
+      - "ghcr.io/hidea88/game-server-watchdog:v{{ .Major }}"
+      - "ghcr.io/hidea88/game-server-watchdog:v{{ .Major }}.{{ .Minor }}"
+      - "ghcr.io/hidea88/game-server-watchdog:latest"
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/hideA88/game-server-watchdog"
+      - "--label=org.opencontainers.image.description=Game Server Watchdog - Discord bot for monitoring game servers"
+      - "--platform=linux/amd64,linux/arm64"
