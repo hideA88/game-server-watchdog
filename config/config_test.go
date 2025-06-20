@@ -35,11 +35,12 @@ func TestLoad(t *testing.T) {
 				"ALLOWED_USER_IDS":    "111,222,333",
 			},
 			want: &Config{
-				DiscordToken:      "test-token",
-				DebugMode:         true,
-				AllowedChannelIDs: []string{"123", "456", "789"},
-				AllowedUserIDs:    []string{"111", "222", "333"},
-				DockerComposePath: "docker-compose.yml",
+				DiscordToken:             "test-token",
+				DebugMode:                true,
+				AllowedChannelIDs:        []string{"123", "456", "789"},
+				AllowedUserIDs:           []string{"111", "222", "333"},
+				DockerComposePath:        "docker-compose.yml",
+				DockerComposeProjectName: "",
 			},
 			wantErr: false,
 		},
@@ -49,11 +50,12 @@ func TestLoad(t *testing.T) {
 				"DISCORD_TOKEN": "test-token",
 			},
 			want: &Config{
-				DiscordToken:      "test-token",
-				DebugMode:         false,
-				AllowedChannelIDs: nil,
-				AllowedUserIDs:    nil,
-				DockerComposePath: "docker-compose.yml",
+				DiscordToken:             "test-token",
+				DebugMode:                false,
+				AllowedChannelIDs:        nil,
+				AllowedUserIDs:           nil,
+				DockerComposePath:        "docker-compose.yml",
+				DockerComposeProjectName: "",
 			},
 			wantErr: false,
 		},
@@ -74,11 +76,12 @@ func TestLoad(t *testing.T) {
 				"ALLOWED_USER_IDS":    "",
 			},
 			want: &Config{
-				DiscordToken:      "test-token",
-				DebugMode:         false,
-				AllowedChannelIDs: []string{},
-				AllowedUserIDs:    []string{},
-				DockerComposePath: "docker-compose.yml",
+				DiscordToken:             "test-token",
+				DebugMode:                false,
+				AllowedChannelIDs:        []string{},
+				AllowedUserIDs:           []string{},
+				DockerComposePath:        "docker-compose.yml",
+				DockerComposeProjectName: "",
 			},
 			wantErr: false,
 		},
@@ -88,11 +91,12 @@ func TestLoad(t *testing.T) {
 				"DISCORD_TOKEN": "test-token",
 			},
 			want: &Config{
-				DiscordToken:      "test-token",
-				DebugMode:         false,
-				AllowedChannelIDs: nil,
-				AllowedUserIDs:    nil,
-				DockerComposePath: "docker-compose.yml",
+				DiscordToken:             "test-token",
+				DebugMode:                false,
+				AllowedChannelIDs:        nil,
+				AllowedUserIDs:           nil,
+				DockerComposePath:        "docker-compose.yml",
+				DockerComposeProjectName: "",
 			},
 			wantErr: false,
 			setupFunc: func() {
@@ -112,7 +116,7 @@ func TestLoad(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// 既存の環境変数を保存
 			originalEnv := make(map[string]string)
-			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS", "DOCKER_COMPOSE_PATH"}
+			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS", "DOCKER_COMPOSE_PATH", "DOCKER_COMPOSE_PROJECT_NAME"}
 			for _, key := range envKeys {
 				originalEnv[key] = os.Getenv(key)
 				os.Unsetenv(key)
@@ -208,11 +212,12 @@ DEBUG_MODE=true
 ALLOWED_CHANNEL_IDS=111,222
 ALLOWED_USER_IDS=333,444`,
 			want: &Config{
-				DiscordToken:      "env-file-token",
-				DebugMode:         true,
-				AllowedChannelIDs: []string{"111", "222"},
-				AllowedUserIDs:    []string{"333", "444"},
-				DockerComposePath: "docker-compose.yml",
+				DiscordToken:             "env-file-token",
+				DebugMode:                true,
+				AllowedChannelIDs:        []string{"111", "222"},
+				AllowedUserIDs:           []string{"333", "444"},
+				DockerComposePath:        "docker-compose.yml",
+				DockerComposeProjectName: "",
 			},
 			wantErr: false,
 		},
@@ -221,7 +226,7 @@ ALLOWED_USER_IDS=333,444`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 環境変数をクリア
-			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS", "DOCKER_COMPOSE_PATH"}
+			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS", "DOCKER_COMPOSE_PATH", "DOCKER_COMPOSE_PROJECT_NAME"}
 			originalEnv := make(map[string]string)
 			for _, key := range envKeys {
 				originalEnv[key] = os.Getenv(key)

@@ -41,7 +41,7 @@ func (c *GameInfoCommand) Description() string {
 
 // Execute runs the command
 func (c *GameInfoCommand) Execute(args []string) (string, error) {
-	containers, err := c.compose.ListContainers(c.composePath)
+	containers, err := c.compose.ListGameContainers(c.composePath)
 	if err != nil {
 		return "", fmt.Errorf("コンテナ情報の取得に失敗しました: %w", err)
 	}
@@ -140,11 +140,11 @@ func FormatServiceName(service string) string {
 	if service == "" {
 		return ""
 	}
-	
+
 	// Replace hyphens and underscores with spaces
 	formatted := strings.ReplaceAll(service, "-", " ")
 	formatted = strings.ReplaceAll(formatted, "_", " ")
-	
+
 	// Split into words and capitalize each
 	words := strings.Fields(formatted)
 	for i, word := range words {
@@ -152,13 +152,13 @@ func FormatServiceName(service string) string {
 			words[i] = strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
 		}
 	}
-	
+
 	return strings.Join(words, " ")
 }
 
 // GetComponents returns Discord message components for the game info command
 func (c *GameInfoCommand) GetComponents(args []string) ([]discordgo.MessageComponent, error) {
-	containers, err := c.compose.ListContainers(c.composePath)
+	containers, err := c.compose.ListGameContainers(c.composePath)
 	if err != nil {
 		return nil, fmt.Errorf("コンテナ情報の取得に失敗しました: %w", err)
 	}
@@ -202,12 +202,12 @@ func (c *GameInfoCommand) GetComponents(args []string) ([]discordgo.MessageCompo
 			if end > len(buttons) {
 				end = len(buttons)
 			}
-			
+
 			row := discordgo.ActionsRow{
 				Components: buttons[i:end],
 			}
 			components = append(components, row)
-			
+
 			// 最大MaxButtonRows行まで
 			if len(components) >= docker.MaxButtonRows {
 				break
@@ -240,11 +240,11 @@ func (c *GameInfoCommand) HandleInteraction(s *discordgo.Session, i *discordgo.I
 	}
 
 	data := i.MessageComponentData()
-	
+
 	// サービス名と操作を判定
 	var serviceName string
 	var isStart bool
-	
+
 	if strings.HasPrefix(data.CustomID, "start_service_") {
 		serviceName = strings.TrimPrefix(data.CustomID, "start_service_")
 		isStart = true
@@ -254,7 +254,7 @@ func (c *GameInfoCommand) HandleInteraction(s *discordgo.Session, i *discordgo.I
 	} else {
 		return fmt.Errorf("unknown custom ID: %s", data.CustomID)
 	}
-	
+
 	// 操作ロックをチェック
 	if _, loaded := c.serviceOperations.LoadOrStore(serviceName, true); loaded {
 		return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -265,7 +265,7 @@ func (c *GameInfoCommand) HandleInteraction(s *discordgo.Session, i *discordgo.I
 			},
 		})
 	}
-	
+
 	// Defer応答を送信（3秒以内）
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
@@ -277,7 +277,7 @@ func (c *GameInfoCommand) HandleInteraction(s *discordgo.Session, i *discordgo.I
 
 	// サービス操作処理を実行
 	go c.handleServiceOperation(s, i, serviceName, isStart)
-	
+
 	return nil
 }
 
@@ -285,12 +285,12 @@ func (c *GameInfoCommand) HandleInteraction(s *discordgo.Session, i *discordgo.I
 func (c *GameInfoCommand) handleServiceOperation(s *discordgo.Session, i *discordgo.InteractionCreate, serviceName string, isStart bool) {
 	// 処理完了時にロックを解放
 	defer c.serviceOperations.Delete(serviceName)
-	
+
 	// サービス操作を実行
 	var err error
 	var successMessage string
 	var errorPrefix string
-	
+
 	if isStart {
 		err = c.StartService(serviceName)
 		successMessage = fmt.Sprintf("✅ %s を起動しました！", FormatServiceName(serviceName))
@@ -300,7 +300,7 @@ func (c *GameInfoCommand) handleServiceOperation(s *discordgo.Session, i *discor
 		successMessage = fmt.Sprintf("🛑 %s を停止しました。", FormatServiceName(serviceName))
 		errorPrefix = "停止"
 	}
-	
+
 	// 結果に応じてメッセージを送信
 	var content string
 	if err != nil {
@@ -309,7 +309,7 @@ func (c *GameInfoCommand) handleServiceOperation(s *discordgo.Session, i *discor
 	} else {
 		content = successMessage
 	}
-	
+
 	// フォローアップメッセージを送信
 	_, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 		Content: content,

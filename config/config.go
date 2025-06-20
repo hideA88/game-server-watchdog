@@ -6,11 +6,12 @@ import (
 )
 
 type Config struct {
-	DiscordToken      string   `envconfig:"DISCORD_TOKEN" required:"true"`
-	DebugMode         bool     `envconfig:"DEBUG_MODE" default:"false"`
-	AllowedChannelIDs []string `envconfig:"ALLOWED_CHANNEL_IDS" separator:","`
-	AllowedUserIDs    []string `envconfig:"ALLOWED_USER_IDS" separator:","`
-	DockerComposePath string   `envconfig:"DOCKER_COMPOSE_PATH" default:"docker-compose.yml"`
+	DiscordToken             string   `envconfig:"DISCORD_TOKEN" required:"true"`
+	DebugMode                bool     `envconfig:"DEBUG_MODE" default:"false"`
+	AllowedChannelIDs        []string `envconfig:"ALLOWED_CHANNEL_IDS" separator:","`
+	AllowedUserIDs           []string `envconfig:"ALLOWED_USER_IDS" separator:","`
+	DockerComposePath        string   `envconfig:"DOCKER_COMPOSE_PATH" default:"docker-compose.yml"`
+	DockerComposeProjectName string   `envconfig:"DOCKER_COMPOSE_PROJECT_NAME" default:""`
 }
 
 func Load() (*Config, error) {

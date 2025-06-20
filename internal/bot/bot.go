@@ -46,5 +46,6 @@ func (b *Bot) Start() error {
 }
 
 func (b *Bot) Stop() {
+	// Discordセッションを閉じる
 	b.session.Close()
 }

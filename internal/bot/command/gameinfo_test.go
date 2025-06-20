@@ -126,7 +126,7 @@ func TestGameInfoCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// モックの設定
 			mockCompose := &docker.MockComposeService{
-				ListContainersFunc: func(path string) ([]docker.ContainerInfo, error) {
+				ListGameContainersFunc: func(path string) ([]docker.ContainerInfo, error) {
 					if path != tt.composePath {
 						t.Errorf("Expected composePath %s, got %s", tt.composePath, path)
 					}
@@ -181,7 +181,7 @@ func TestGameInfoCommand_DefaultPath(t *testing.T) {
 	t.Parallel()
 
 	mockCompose := &docker.MockComposeService{
-		ListContainersFunc: func(path string) ([]docker.ContainerInfo, error) {
+		ListGameContainersFunc: func(path string) ([]docker.ContainerInfo, error) {
 			// デフォルトパスが使用されているかチェック
 			if path != "docker-compose.yml" {
 				t.Errorf("Expected default path 'docker-compose.yml', got %s", path)
@@ -244,7 +244,6 @@ func TestGameInfoCommand_HandleInteraction(t *testing.T) {
 	// Skip this test for now as it requires proper Discord session mocking
 	t.Skip("Skipping HandleInteraction test - requires proper Discord session mocking")
 }
-
 
 func TestFormatServiceName(t *testing.T) {
 	t.Parallel()
