@@ -34,7 +34,7 @@ func TestDefaultComposeService_SetProjectName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			service := &DefaultComposeService{}
 			service.SetProjectName(tt.projectName)
-			
+
 			if service.projectName != tt.want {
 				t.Errorf("SetProjectName() projectName = %v, want %v", service.projectName, tt.want)
 			}
@@ -92,15 +92,15 @@ func TestCalculateCPUPercent(t *testing.T) { //nolint:funlen // テーブル駆�
 			stats: &container.StatsResponse{
 				CPUStats: container.CPUStats{
 					CPUUsage: container.CPUUsage{
-						TotalUsage:   2000000000, // 2秒
-						PercpuUsage:  []uint64{1000000000, 1000000000}, // 2コア
+						TotalUsage:  2000000000,                       // 2秒
+						PercpuUsage: []uint64{1000000000, 1000000000}, // 2コア
 					},
 					SystemUsage: 4000000000, // 4秒（システム全体）
 				},
 				PreCPUStats: container.CPUStats{
 					CPUUsage: container.CPUUsage{
-						TotalUsage:   1000000000, // 1秒
-						PercpuUsage:  []uint64{500000000, 500000000}, // 2コア
+						TotalUsage:  1000000000,                     // 1秒
+						PercpuUsage: []uint64{500000000, 500000000}, // 2コア
 					},
 					SystemUsage: 2000000000, // 2秒（システム全体）
 				},
@@ -112,15 +112,15 @@ func TestCalculateCPUPercent(t *testing.T) { //nolint:funlen // テーブル駆�
 			stats: &container.StatsResponse{
 				CPUStats: container.CPUStats{
 					CPUUsage: container.CPUUsage{
-						TotalUsage:   1000000000,
-						PercpuUsage:  []uint64{500000000, 500000000},
+						TotalUsage:  1000000000,
+						PercpuUsage: []uint64{500000000, 500000000},
 					},
 					SystemUsage: 2000000000,
 				},
 				PreCPUStats: container.CPUStats{
 					CPUUsage: container.CPUUsage{
-						TotalUsage:   1000000000, // 変化なし
-						PercpuUsage:  []uint64{500000000, 500000000},
+						TotalUsage:  1000000000, // 変化なし
+						PercpuUsage: []uint64{500000000, 500000000},
 					},
 					SystemUsage: 2000000000, // 変化なし
 				},
@@ -132,15 +132,15 @@ func TestCalculateCPUPercent(t *testing.T) { //nolint:funlen // テーブル駆�
 			stats: &container.StatsResponse{
 				CPUStats: container.CPUStats{
 					CPUUsage: container.CPUUsage{
-						TotalUsage:   2000000000,
-						PercpuUsage:  []uint64{1000000000, 1000000000},
+						TotalUsage:  2000000000,
+						PercpuUsage: []uint64{1000000000, 1000000000},
 					},
 					SystemUsage: 2000000000,
 				},
 				PreCPUStats: container.CPUStats{
 					CPUUsage: container.CPUUsage{
-						TotalUsage:   1000000000,
-						PercpuUsage:  []uint64{500000000, 500000000},
+						TotalUsage:  1000000000,
+						PercpuUsage: []uint64{500000000, 500000000},
 					},
 					SystemUsage: 2000000000, // 変化なし
 				},

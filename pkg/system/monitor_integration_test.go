@@ -12,7 +12,7 @@ func TestDefaultMonitor_GetSystemInfo_Integration(t *testing.T) {
 	}
 
 	monitor := NewDefaultMonitor()
-	
+
 	start := time.Now()
 	info, err := monitor.GetSystemInfo()
 	elapsed := time.Since(start)
@@ -63,14 +63,14 @@ func TestDefaultMonitor_GetSystemInfo_Integration(t *testing.T) {
 	calculatedMemUsedPercent := (info.MemoryUsedGB / info.MemoryTotalGB) * 100
 	memPercentDiff := abs(info.MemoryUsedPercent - calculatedMemUsedPercent)
 	if memPercentDiff > 1.0 { // 1%以下の誤差は許容
-		t.Errorf("Memory percent calculation inconsistent: reported=%f, calculated=%f", 
+		t.Errorf("Memory percent calculation inconsistent: reported=%f, calculated=%f",
 			info.MemoryUsedPercent, calculatedMemUsedPercent)
 	}
 
 	calculatedDiskUsedPercent := ((info.DiskTotalGB - info.DiskFreeGB) / info.DiskTotalGB) * 100
 	diskPercentDiff := abs(info.DiskUsedPercent - calculatedDiskUsedPercent)
 	if diskPercentDiff > 5.0 { // 5%以下の誤差は許容（ファイルシステムメタデータのため）
-		t.Errorf("Disk percent calculation inconsistent: reported=%f, calculated=%f", 
+		t.Errorf("Disk percent calculation inconsistent: reported=%f, calculated=%f",
 			info.DiskUsedPercent, calculatedDiskUsedPercent)
 	}
 }
@@ -82,7 +82,7 @@ func TestDefaultMonitor_GetSystemInfo_Performance(t *testing.T) {
 	}
 
 	monitor := NewDefaultMonitor()
-	
+
 	// 複数回実行してパフォーマンスをチェック
 	const iterations = 3
 	var totalDuration time.Duration
@@ -91,13 +91,13 @@ func TestDefaultMonitor_GetSystemInfo_Performance(t *testing.T) {
 		start := time.Now()
 		_, err := monitor.GetSystemInfo()
 		elapsed := time.Since(start)
-		
+
 		if err != nil {
 			t.Fatalf("Iteration %d failed: %v", i, err)
 		}
-		
+
 		totalDuration += elapsed
-		
+
 		// 各回の実行時間をチェック
 		if elapsed > 2*time.Second {
 			t.Errorf("Iteration %d took too long: %v", i, elapsed)
@@ -106,7 +106,7 @@ func TestDefaultMonitor_GetSystemInfo_Performance(t *testing.T) {
 
 	avgDuration := totalDuration / iterations
 	t.Logf("Average execution time: %v", avgDuration)
-	
+
 	// 平均実行時間のチェック
 	if avgDuration > 1500*time.Millisecond {
 		t.Errorf("Average execution time too long: %v", avgDuration)
@@ -120,10 +120,10 @@ func TestDefaultMonitor_GetSystemInfo_MemoryLeak(t *testing.T) {
 	}
 
 	monitor := NewDefaultMonitor()
-	
+
 	// 大量実行でメモリリークがないかチェック
 	const iterations = 20
-	
+
 	for i := 0; i < iterations; i++ {
 		info, err := monitor.GetSystemInfo()
 		if err != nil {
@@ -132,7 +132,7 @@ func TestDefaultMonitor_GetSystemInfo_MemoryLeak(t *testing.T) {
 		if info == nil {
 			t.Fatalf("Iteration %d returned nil", i)
 		}
-		
+
 		// 5回ごとにログ出力
 		if (i+1)%5 == 0 {
 			t.Logf("Completed %d iterations", i+1)
@@ -147,13 +147,13 @@ func TestDefaultMonitor_GetSystemInfo_UnderLoad(t *testing.T) {
 	}
 
 	monitor := NewDefaultMonitor()
-	
+
 	// 並行してシステム情報を取得
 	const goroutines = 5
 	const iterationsPerGoroutine = 3
-	
+
 	results := make(chan error, goroutines*iterationsPerGoroutine)
-	
+
 	for g := 0; g < goroutines; g++ {
 		go func(_ int) {
 			for i := 0; i < iterationsPerGoroutine; i++ {
@@ -170,7 +170,7 @@ func TestDefaultMonitor_GetSystemInfo_UnderLoad(t *testing.T) {
 			}
 		}(g)
 	}
-	
+
 	// 結果をチェック
 	for i := 0; i < goroutines*iterationsPerGoroutine; i++ {
 		err := <-results
@@ -187,44 +187,44 @@ func TestDefaultMonitor_GetSystemInfo_ValueRanges(t *testing.T) {
 	}
 
 	monitor := NewDefaultMonitor()
-	
+
 	// 複数回実行して値の安定性をチェック
 	const samples = 2
 	infos := make([]*SystemInfo, samples)
-	
+
 	for i := 0; i < samples; i++ {
 		info, err := monitor.GetSystemInfo()
 		if err != nil {
 			t.Fatalf("Sample %d failed: %v", i, err)
 		}
 		infos[i] = info
-		
+
 		// サンプル間で少し待機
 		if i < samples-1 {
 			time.Sleep(50 * time.Millisecond)
 		}
 	}
-	
+
 	// 各サンプルの値をチェック
 	for i, info := range infos {
-		t.Logf("Sample %d: CPU=%.2f%%, Mem=%.2f%%, Disk=%.2f%%", 
+		t.Logf("Sample %d: CPU=%.2f%%, Mem=%.2f%%, Disk=%.2f%%",
 			i, info.CPUUsagePercent, info.MemoryUsedPercent, info.DiskUsedPercent)
-		
+
 		// 基本的な範囲チェック
 		validateSystemInfo(t, info, i)
 	}
-	
+
 	// サンプル間の変動チェック（メモリとディスクはそれほど変動しないはず）
 	for i := 1; i < samples; i++ {
 		memDiff := abs(infos[i].MemoryUsedPercent - infos[0].MemoryUsedPercent)
 		if memDiff > 10.0 { // 10%以上の変動は異常
-			t.Errorf("Memory usage varied too much between samples: %f -> %f", 
+			t.Errorf("Memory usage varied too much between samples: %f -> %f",
 				infos[0].MemoryUsedPercent, infos[i].MemoryUsedPercent)
 		}
-		
+
 		diskDiff := abs(infos[i].DiskUsedPercent - infos[0].DiskUsedPercent)
 		if diskDiff > 1.0 { // 1%以上の変動は異常
-			t.Errorf("Disk usage varied too much between samples: %f -> %f", 
+			t.Errorf("Disk usage varied too much between samples: %f -> %f",
 				infos[0].DiskUsedPercent, infos[i].DiskUsedPercent)
 		}
 	}
@@ -233,12 +233,12 @@ func TestDefaultMonitor_GetSystemInfo_ValueRanges(t *testing.T) {
 // validateSystemInfo はSystemInfoの値が妥当かチェックする
 func validateSystemInfo(t *testing.T, info *SystemInfo, sampleID int) {
 	t.Helper()
-	
+
 	// CPU使用率
 	if info.CPUUsagePercent < 0 || info.CPUUsagePercent > 100 {
 		t.Errorf("Sample %d: CPU usage out of range: %f", sampleID, info.CPUUsagePercent)
 	}
-	
+
 	// メモリ情報
 	if info.MemoryTotalGB <= 0 {
 		t.Errorf("Sample %d: Memory total should be positive: %f", sampleID, info.MemoryTotalGB)
@@ -247,13 +247,13 @@ func validateSystemInfo(t *testing.T, info *SystemInfo, sampleID int) {
 		t.Errorf("Sample %d: Memory used should be non-negative: %f", sampleID, info.MemoryUsedGB)
 	}
 	if info.MemoryUsedGB > info.MemoryTotalGB {
-		t.Errorf("Sample %d: Memory used exceeds total: used=%f, total=%f", 
+		t.Errorf("Sample %d: Memory used exceeds total: used=%f, total=%f",
 			sampleID, info.MemoryUsedGB, info.MemoryTotalGB)
 	}
 	if info.MemoryUsedPercent < 0 || info.MemoryUsedPercent > 100 {
 		t.Errorf("Sample %d: Memory used percent out of range: %f", sampleID, info.MemoryUsedPercent)
 	}
-	
+
 	// ディスク情報
 	if info.DiskTotalGB <= 0 {
 		t.Errorf("Sample %d: Disk total should be positive: %f", sampleID, info.DiskTotalGB)
@@ -262,13 +262,13 @@ func validateSystemInfo(t *testing.T, info *SystemInfo, sampleID int) {
 		t.Errorf("Sample %d: Disk free should be non-negative: %f", sampleID, info.DiskFreeGB)
 	}
 	if info.DiskFreeGB > info.DiskTotalGB {
-		t.Errorf("Sample %d: Disk free exceeds total: free=%f, total=%f", 
+		t.Errorf("Sample %d: Disk free exceeds total: free=%f, total=%f",
 			sampleID, info.DiskFreeGB, info.DiskTotalGB)
 	}
 	if info.DiskUsedPercent < 0 || info.DiskUsedPercent > 100 {
 		t.Errorf("Sample %d: Disk used percent out of range: %f", sampleID, info.DiskUsedPercent)
 	}
-	
+
 	// 妥当な最小値チェック（あまりに小さい値は異常）
 	if info.MemoryTotalGB < 0.1 { // 100MB未満は異常
 		t.Errorf("Sample %d: Memory total too small: %f", sampleID, info.MemoryTotalGB)
@@ -289,7 +289,7 @@ func abs(x float64) float64 {
 // ベンチマークテスト
 func BenchmarkDefaultMonitor_GetSystemInfo(b *testing.B) {
 	monitor := NewDefaultMonitor()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := monitor.GetSystemInfo()
@@ -302,7 +302,7 @@ func BenchmarkDefaultMonitor_GetSystemInfo(b *testing.B) {
 // 並行実行ベンチマーク
 func BenchmarkDefaultMonitor_GetSystemInfo_Parallel(b *testing.B) {
 	monitor := NewDefaultMonitor()
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {

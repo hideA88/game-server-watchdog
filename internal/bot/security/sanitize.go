@@ -9,7 +9,7 @@ import (
 var (
 	// tokenPatterns はトークンのようなセンシティブな情報を検出する正規表現
 	tokenPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`(?i)(token[:\s]+)([\x60]?)([a-zA-Z0-9.\-_+]{8,})([\x60]?)`), // \x60 = backtick
+		regexp.MustCompile(`(?i)(token[:\s]+)([\x60]?)([a-zA-Z0-9.\-_+]{8,})([\x60]?)`),  // \x60 = backtick
 		regexp.MustCompile(`(?i)(secret[:\s]+)([\x60]?)([a-zA-Z0-9.\-_+]{6,})([\x60]?)`), // secretは6文字以上
 		regexp.MustCompile(`(?i)(password[:\s]+)([\x60]?)([a-zA-Z0-9.\-_+]{4,})([\x60]?)`),
 		regexp.MustCompile(`(?i)(key[:\s]+)([\x60]?)([a-zA-Z0-9.\-_+]{8,})([\x60]?)`),
@@ -24,7 +24,7 @@ var (
 
 	// ipPatterns はIPアドレスを検出する正規表現
 	ipPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b`), // IPv4（ポート番号含む）
+		regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b`),           // IPv4（ポート番号含む）
 		regexp.MustCompile(`\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{0,4}\b`), // IPv6の改良パターン
 	}
 )
@@ -89,14 +89,14 @@ func isCommonPath(path string) bool {
 	}
 
 	path = strings.ToLower(path)
-	
+
 	// /homeは特別扱い - /home/username までは保持、それ以降の個人ファイルは隠す
 	if strings.HasPrefix(path, "/home/") {
 		parts := strings.Split(path, "/")
 		// /home/username までは一般的、それ以下の深いパスは非一般的
 		return len(parts) <= 3
 	}
-	
+
 	for _, common := range commonPaths {
 		if strings.HasPrefix(path, common) {
 			return true

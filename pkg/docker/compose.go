@@ -47,12 +47,12 @@ func (s *DefaultComposeService) getProjectName(composePath string) string {
 	// デフォルトはディレクトリ名を使用
 	dir := filepath.Dir(composePath)
 	defaultName := filepath.Base(dir)
-	
+
 	// ルートディレクトリの場合は空文字列を返す
 	if defaultName == "/" || defaultName == "." {
 		return ""
 	}
-	
+
 	return defaultName
 }
 

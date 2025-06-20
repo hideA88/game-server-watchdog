@@ -426,10 +426,10 @@ func TestLogsCommand_buildLogOutput(t *testing.T) {
 
 func TestLogsCommand_addFormattedLogs(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
 	tests := []struct {
-		name             string
-		logs             string
-		requestedLines   int
-		expectedContains []string
+		name                string
+		logs                string
+		requestedLines      int
+		expectedContains    []string
 		expectedNotContains []string
 	}{
 		{
@@ -468,9 +468,9 @@ func TestLogsCommand_addFormattedLogs(t *testing.T) { //nolint:funlen // テー�
 			},
 		},
 		{
-			name:            "最大行数以下の場合は注意メッセージなし",
-			logs:            "Single line",
-			requestedLines:  100,
+			name:           "最大行数以下の場合は注意メッセージなし",
+			logs:           "Single line",
+			requestedLines: 100,
 			expectedNotContains: []string{
 				"(注意: 最大200行に制限されています)",
 			},
@@ -481,7 +481,7 @@ func TestLogsCommand_addFormattedLogs(t *testing.T) { //nolint:funlen // テー�
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := NewLogsCommand(&docker.MockComposeService{}, "")
 			var builder strings.Builder
-			
+
 			cmd.addFormattedLogs(&builder, tt.logs, tt.requestedLines)
 			result := builder.String()
 
@@ -538,7 +538,7 @@ func TestLogsCommand_MessageLengthLimit(t *testing.T) {
 func TestLogsCommand_Performance(t *testing.T) {
 	// 大量のログでパフォーマンステスト
 	largeLog := strings.Repeat("Log line with some content\n", 10000)
-	
+
 	cmd := NewLogsCommand(&docker.MockComposeService{
 		ListContainersFunc: func(string) ([]docker.ContainerInfo, error) {
 			return []docker.ContainerInfo{

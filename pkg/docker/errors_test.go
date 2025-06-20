@@ -122,7 +122,7 @@ func TestNewDockerError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := NewDockerError(tt.operation, tt.cause)
-			
+
 			if result.Operation != tt.expected.Operation {
 				t.Errorf("Operation = %v, want %v", result.Operation, tt.expected.Operation)
 			}
@@ -163,7 +163,7 @@ func TestNewDockerContainerError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := NewDockerContainerError(tt.operation, tt.container, tt.cause)
-			
+
 			if err.Container != tt.want {
 				t.Errorf("NewDockerContainerError() Container = %v, want %v", err.Container, tt.want)
 			}
@@ -198,7 +198,7 @@ func TestNewDockerServiceError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := NewDockerServiceError(tt.operation, tt.service, tt.cause)
-			
+
 			if err.Service != tt.want {
 				t.Errorf("NewDockerServiceError() Service = %v, want %v", err.Service, tt.want)
 			}

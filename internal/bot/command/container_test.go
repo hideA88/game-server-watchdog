@@ -58,16 +58,16 @@ func TestNewContainerCommand(t *testing.T) {
 
 func TestContainerCommand_Execute(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
 	tests := []struct {
-		name              string
-		args              []string
-		containers        []docker.ContainerInfo
-		containerStats    *docker.ContainerStats
-		containerLogs     string
-		listError         error
-		statsError        error
-		logsError         error
-		expectError       bool
-		expectedContains  []string
+		name                string
+		args                []string
+		containers          []docker.ContainerInfo
+		containerStats      *docker.ContainerStats
+		containerLogs       string
+		listError           error
+		statsError          error
+		logsError           error
+		expectError         bool
+		expectedContains    []string
 		expectedNotContains []string
 	}{
 		{
@@ -210,9 +210,9 @@ func TestContainerCommand_Execute(t *testing.T) { //nolint:funlen // テーブ�
 			},
 		},
 		{
-			name:        "存在しないサービス",
-			args:        []string{"nonexistent"},
-			containers:  []docker.ContainerInfo{},
+			name:       "存在しないサービス",
+			args:       []string{"nonexistent"},
+			containers: []docker.ContainerInfo{},
 			expectedContains: []string{
 				"❌ サービス 'nonexistent' が見つかりません",
 			},
@@ -428,8 +428,8 @@ func TestContainerCommand_findContainer(t *testing.T) { //nolint:funlen // テ�
 
 func TestContainerCommand_addBasicInfo(t *testing.T) {
 	tests := []struct {
-		name         string
-		container    *docker.ContainerInfo
+		name             string
+		container        *docker.ContainerInfo
 		expectedContains []string
 	}{
 		{
@@ -473,7 +473,7 @@ func TestContainerCommand_addBasicInfo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := NewContainerCommand(&docker.MockComposeService{}, "")
 			var builder strings.Builder
-			
+
 			cmd.addBasicInfo(&builder, tt.container)
 			result := builder.String()
 
@@ -488,15 +488,15 @@ func TestContainerCommand_addBasicInfo(t *testing.T) {
 
 func TestContainerCommand_addResourceInfo(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
 	tests := []struct {
-		name             string
-		container        *docker.ContainerInfo
-		stats            *docker.ContainerStats
-		statsError       error
-		expectedContains []string
+		name                string
+		container           *docker.ContainerInfo
+		stats               *docker.ContainerStats
+		statsError          error
+		expectedContains    []string
 		expectedNotContains []string
 	}{
 		{
-			name: "正常なリソース情報",
+			name:      "正常なリソース情報",
 			container: &docker.ContainerInfo{Name: "app_web_1"},
 			stats: &docker.ContainerStats{
 				CPUPercent:    45.2,
@@ -515,7 +515,7 @@ func TestContainerCommand_addResourceInfo(t *testing.T) { //nolint:funlen // テ
 			},
 		},
 		{
-			name: "高負荷警告",
+			name:      "高負荷警告",
 			container: &docker.ContainerInfo{Name: "app_worker_1"},
 			stats: &docker.ContainerStats{
 				CPUPercent:    90.0,
@@ -548,7 +548,7 @@ func TestContainerCommand_addResourceInfo(t *testing.T) { //nolint:funlen // テ
 
 			cmd := NewContainerCommand(mockCompose, "")
 			var builder strings.Builder
-			
+
 			cmd.addResourceInfo(&builder, tt.container)
 			result := builder.String()
 
@@ -606,7 +606,7 @@ func TestContainerCommand_addRecentLogs(t *testing.T) {
 
 			cmd := NewContainerCommand(mockCompose, "")
 			var builder strings.Builder
-			
+
 			cmd.addRecentLogs(&builder, tt.serviceName)
 			result := builder.String()
 
@@ -621,10 +621,10 @@ func TestContainerCommand_addRecentLogs(t *testing.T) {
 
 func TestContainerCommand_addAvailableCommands(t *testing.T) {
 	tests := []struct {
-		name             string
-		serviceName      string
-		state            string
-		expectedContains []string
+		name                string
+		serviceName         string
+		state               string
+		expectedContains    []string
 		expectedNotContains []string
 	}{
 		{
@@ -654,7 +654,7 @@ func TestContainerCommand_addAvailableCommands(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := NewContainerCommand(&docker.MockComposeService{}, "")
 			var builder strings.Builder
-			
+
 			cmd.addAvailableCommands(&builder, tt.serviceName, tt.state)
 			result := builder.String()
 

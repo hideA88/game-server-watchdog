@@ -381,7 +381,7 @@ func TestContainsCredentials(t *testing.T) { //nolint:funlen // テーブル駆�
 // ベンチマークテスト
 func BenchmarkSanitizeErrorMessage(b *testing.B) {
 	message := "Discord token: abc123def456ghi789jkl012mno345pqr678 at /home/user/secret/config.json with IP 203.0.113.1"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		SanitizeErrorMessage(message)
@@ -390,7 +390,7 @@ func BenchmarkSanitizeErrorMessage(b *testing.B) {
 
 func BenchmarkSanitizeForDiscord(b *testing.B) {
 	message := "Error with `code` and *bold* token: abc123def456ghi789jkl012mno345pqr678"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		SanitizeForDiscord(message)
