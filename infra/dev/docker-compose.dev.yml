@@ -1,0 +1,113 @@
+# 開発用 Docker Compose ファイル
+# watchdog のローカル開発での動作確認用
+
+services:
+  minecraft:
+    image: itzg/minecraft-bedrock-server
+    container_name: minecraft-server
+    volumes:
+      - ./games/minecraft/data:/data
+      - ./games/minecraft/data/worlds:/data/worlds
+      - ./shared/logs:/var/log/minecraft
+    ports:
+      - "19132:19132/udp" # IPv4 gameplay
+      - "19133:19133/udp" # IPv6 gameplay
+    environment:
+      - EULA=TRUE
+      - GAMEMODE=survival
+      - DIFFICULTY=normal
+      - LEVEL_NAME=Bedrock level
+      - ALLOW_CHEATS=false
+      - MAX_PLAYERS=10
+      - ONLINE_MODE=true
+      - WHITE_LIST=false
+    deploy:
+      resources:
+        limits:
+          cpus: '2' # 開発用に削減
+          memory: 4G # 開発用に削減
+        reservations:
+          cpus: '1'
+          memory: 2G
+    restart: unless-stopped
+    labels:
+      - "game.type=minecraft"
+      - "game.platform=bedrock"
+
+  ark-island:
+    image: acekorneya/asa_server:latest
+    container_name: ark-island
+    restart: unless-stopped
+    environment:
+      - PUID=1001
+      - PGID=1001
+      - BATTLEYE=FALSE
+      - RCON_ENABLED=TRUE
+      - DISPLAY_POK_MONITOR_MESSAGE=FALSE
+      - UPDATE_SERVER=FALSE # 開発用に更新チェックを無効化
+      - CHECK_FOR_UPDATE_INTERVAL=24
+      - UPDATE_WINDOW_MINIMUM_TIME=12:00 AM
+      - UPDATE_WINDOW_MAXIMUM_TIME=11:59 PM
+      - RESTART_NOTICE_MINUTES=30
+      - ENABLE_MOTD=FALSE
+      - MOTD=
+      - MOTD_DURATION=30
+      - MAP_NAME=TheIsland
+      - SESSION_NAME=ark-island-dev # 開発用に変更
+      - SERVER_ADMIN_PASSWORD=devadmin # 開発用パスワード
+      - SERVER_PASSWORD= # 開発用にパスワードなし
+      - ASA_PORT=7777
+      - RCON_PORT=27020
+      - MAX_PLAYERS=5 # 開発用に削減
+      - CLUSTER_ID=dev-cluster # 開発用クラスターID
+      - MOD_IDS= # 開発用にMODなし
+      - CUSTOM_SERVER_ARGS=
+    ports:
+      - "7777:7777/tcp"
+      - "7777:7777/udp"
+    volumes:
+      - "./games/ark/ASA_Island:/usr/games/.wine/drive_c/POK/Steam/steamapps/common/ARK Survival Ascended Dedicated Server/ShooterGame"
+      - "./games/ark/Dedicated Server:/usr/games/.wine/drive_c/POK/Steam/steamapps/common/ARK Survival Ascended Dedicated Server"
+      - "./games/ark/Cluster:/usr/games/.wine/drive_c/POK/Steam/steamapps/common/ShooterGame"
+    mem_limit: 8G # 開発用に削減
+    labels:
+      - "game.type=ark"
+      - "game.map=island"
+
+  # Watchdog（開発中のコード）
+  watchdog:
+    build:
+      context: ../..
+      dockerfile: infra/dev/Dockerfile.dev
+    container_name: watchdog-dev
+    environment:
+      # Discord Bot の設定
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - ALLOWED_CHANNEL_IDS=${ALLOWED_CHANNEL_IDS}
+      - ALLOWED_USER_IDS=${ALLOWED_USER_IDS}
+      - DOCKER_COMPOSE_PATH=/config/docker-compose.dev.yml
+      - DOCKER_COMPOSE_PROJECT_NAME=dev
+      - DEBUG_MODE=true
+    volumes:
+      # Docker ソケット（コンテナ操作用）
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # docker-compose.dev.yml を読み取り専用でマウント
+      - ./docker-compose.dev.yml:/config/docker-compose.dev.yml:ro
+      # .env ファイル
+      - ./.env:/config/.env:ro
+      # ホストのシステム情報にアクセス（読み取り専用）
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    restart: unless-stopped
+    depends_on:
+      # ゲームサーバーが起動してから監視を開始
+      - minecraft
+      - ark-island
+    labels:
+      - "service.type=watchdog"
+      - "environment=development"
+
+networks:
+  default:
+    name: dev_default
+    driver: bridge

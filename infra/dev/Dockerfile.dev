@@ -1,0 +1,32 @@
+# 開発用 Dockerfile
+# ローカルのコードをビルドして即座にテスト
+
+FROM golang:1.24-alpine AS builder
+
+# ビルドに必要なパッケージをインストール
+RUN apk add --no-cache git make
+
+WORKDIR /build
+
+# 依存関係のキャッシュを効かせるため、先にgo.modとgo.sumをコピー
+COPY go.mod go.sum ./
+RUN go mod download
+
+# ソースコードをコピー
+COPY . .
+
+# ビルド
+RUN go build -o watchdog cmd/watchdog/main.go
+
+# 実行用の軽量イメージ
+FROM alpine:latest
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+# ビルドしたバイナリをコピー
+COPY --from=builder /build/watchdog /app/
+
+# 実行
+CMD ["./watchdog"]
