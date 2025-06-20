@@ -1,0 +1,78 @@
+# Game Server Watchdog - Docker Compose Example
+#
+# 使用方法:
+# 1. このファイルを docker-compose.yml にコピー
+# 2. .env ファイルを作成し、必要な環境変数を設定
+# 3. docker compose up -d で起動
+
+services:
+  game-watchdog:
+    image: ghcr.io/hidea88/game-server-watchdog:latest
+    container_name: game-watchdog
+    restart: unless-stopped
+    environment:
+      # Discord Bot の設定（必須）
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+
+      # アクセス制御（オプション）
+      - ALLOWED_CHANNEL_IDS=${ALLOWED_CHANNEL_IDS}
+      - ALLOWED_USER_IDS=${ALLOWED_USER_IDS}
+
+      # Docker Compose の設定
+      - DOCKER_COMPOSE_PATH=/config/docker-compose.yml
+      - DOCKER_COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-gameserver}
+
+      # デバッグモード（オプション）
+      - DEBUG_MODE=${DEBUG_MODE:-false}
+
+    volumes:
+      # Docker ソケット（必須）
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      # ゲームサーバーの docker-compose.yml（必須）
+      # 実際のパスに変更してください
+      - ./docker-compose.yml:/config/docker-compose.yml:ro
+
+      # .env ファイル（オプション）
+      - ./.env:/config/.env:ro
+
+      # ホストのシステム情報にアクセス（監視機能用）
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+
+    # Dockerソケットへのアクセス権限を付与
+    # 注意: これによりコンテナはホストのDockerを完全に制御できます
+    security_opt:
+      - no-new-privileges:true
+
+    # リソース制限（必要に応じて調整）
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+    # ヘルスチェック
+    healthcheck:
+      test: [ "CMD", "pgrep", "game-server-watchdog" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    # ログ設定
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    # ゲームサーバーと同じネットワークに接続する場合は
+    # external: true を設定し、name を指定してください
+    # external: true
+    # name: gameserver_default
