@@ -407,57 +407,103 @@ func (c *MonitorCommand) HandleInteraction(s *discordgo.Session, i *discordgo.In
 }
 
 // handleServiceOperation はサービスの起動/停止処理を行う
-func (c *MonitorCommand) handleServiceOperation(s *discordgo.Session, i *discordgo.InteractionCreate, serviceName string, isStart bool) {
-	logger := logging.FromContext(c.ctx)
-
-	// 処理完了時にロックを解放
+func (c *MonitorCommand) handleServiceOperation(
+	s *discordgo.Session,
+	i *discordgo.InteractionCreate,
+	serviceName string,
+	isStart bool,
+) {
+	// 初期化と検証
+	ctx, cancel, logger := c.setupServiceOperation()
+	defer cancel()
 	defer c.serviceOperations.Delete(serviceName)
 
-	// 親コンテキストがキャンセルされた場合は早期終了
+	// パニックリカバリーを設定
+	defer c.handlePanicRecovery(ctx, s, i, serviceName, isStart, logger)
+
+	// 親コンテキストのキャンセルをチェック
+	if c.isParentContextCanceled(serviceName, logger) {
+		return
+	}
+
+	// サービス操作を実行
+	result := c.executeServiceOperation(ctx, serviceName, isStart)
+
+	// 結果を処理してメッセージを送信
+	c.handleOperationResult(s, i, serviceName, isStart, result, logger)
+}
+
+// setupServiceOperation は初期化とコンテキストの設定を行う
+func (c *MonitorCommand) setupServiceOperation() (context.Context, context.CancelFunc, logging.Logger) {
+	logger := logging.FromContext(c.ctx)
+	ctx, cancel := context.WithTimeout(c.ctx, ServiceOperationTimeout)
+	return ctx, cancel, logger
+}
+
+// isParentContextCanceled は親コンテキストがキャンセルされているかチェックする
+func (c *MonitorCommand) isParentContextCanceled(serviceName string, logger logging.Logger) bool {
 	select {
 	case <-c.ctx.Done():
 		logger.Warn(c.ctx, "Parent context canceled, aborting operation",
 			logging.String("service", serviceName))
-		return
+		return true
 	default:
+		return false
 	}
+}
 
-	// タイムアウト付きコンテキストを作成
-	ctx, cancel := context.WithTimeout(c.ctx, ServiceOperationTimeout)
-	defer cancel()
+// handlePanicRecovery はパニックが発生した場合のリカバリー処理を行う
+func (c *MonitorCommand) handlePanicRecovery(
+	ctx context.Context,
+	s *discordgo.Session,
+	i *discordgo.InteractionCreate,
+	serviceName string,
+	isStart bool,
+	logger logging.Logger,
+) {
+	if r := recover(); r != nil {
+		logger.Error(ctx, "Panic in handleServiceOperation",
+			logging.String("panic", fmt.Sprintf("%v", r)),
+			logging.String("service", serviceName),
+			logging.Bool("start", isStart))
 
-	// パニックリカバリー
-	defer func() {
-		if r := recover(); r != nil {
-			logger.Error(ctx, "Panic in handleServiceOperation",
-				logging.String("panic", fmt.Sprintf("%v", r)),
-				logging.String("service", serviceName),
-				logging.Bool("start", isStart))
+		// エラーメッセージを送信
+		message := fmt.Sprintf("❌ 予期しないエラーが発生しました: %v", r)
+		_, _ = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+			Content: message,
+		})
+	}
+}
 
-			// エラーメッセージを送信
-			_, _ = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
-				Content: fmt.Sprintf("❌ 予期しないエラーが発生しました: %v", r),
-			})
-		}
-	}()
+// ServiceOperationResult はサービス操作の実行結果を表す
+type ServiceOperationResult struct {
+	Err            error
+	SuccessMessage string
+	ErrorPrefix    string
+}
 
-	// サービス操作を実行
-	var err error
-	var successMessage string
-	var errorPrefix string
+// executeServiceOperation はサービス操作を実行し、結果を返す
+func (c *MonitorCommand) executeServiceOperation(
+	ctx context.Context,
+	serviceName string,
+	isStart bool,
+) ServiceOperationResult {
+	var result ServiceOperationResult
 
 	// タイムアウトチャンネルとの競合を処理
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		if isStart {
-			err = c.compose.StartService(c.composePath, serviceName)
-			successMessage = fmt.Sprintf("✅ %s を起動しました！", FormatServiceName(serviceName))
-			errorPrefix = "起動"
+			result.Err = c.compose.StartService(c.composePath, serviceName)
+			formattedName := FormatServiceName(serviceName)
+			result.SuccessMessage = fmt.Sprintf("✅ %s を起動しました！", formattedName)
+			result.ErrorPrefix = "起動"
 		} else {
-			err = c.compose.StopService(c.composePath, serviceName)
-			successMessage = fmt.Sprintf("🛑 %s を停止しました。", FormatServiceName(serviceName))
-			errorPrefix = "停止"
+			result.Err = c.compose.StopService(c.composePath, serviceName)
+			formattedName := FormatServiceName(serviceName)
+			result.SuccessMessage = fmt.Sprintf("🛑 %s を停止しました。", formattedName)
+			result.ErrorPrefix = "停止"
 		}
 	}()
 
@@ -467,27 +513,64 @@ func (c *MonitorCommand) handleServiceOperation(s *discordgo.Session, i *discord
 		// 正常完了
 	case <-ctx.Done():
 		// タイムアウト
-		err = fmt.Errorf("操作がタイムアウトしました (%v)", ServiceOperationTimeout)
-		errorPrefix = "操作"
+		result.Err = fmt.Errorf("操作がタイムアウトしました (%v)", ServiceOperationTimeout)
+		result.ErrorPrefix = "操作"
 	}
 
-	// 結果に応じてメッセージを送信
-	var content string
+	return result
+}
+
+// handleOperationResult は操作結果を処理してDiscordにメッセージを送信する
+func (c *MonitorCommand) handleOperationResult(
+	s *discordgo.Session,
+	i *discordgo.InteractionCreate,
+	serviceName string,
+	isStart bool,
+	result ServiceOperationResult,
+	logger logging.Logger,
+) {
+	// 結果に応じてメッセージを作成
+	content := c.createResponseMessage(serviceName, result)
+
+	// ログを出力
+	c.logOperationResult(serviceName, isStart, result.Err, logger)
+
+	// フォローアップメッセージを送信
+	c.sendFollowupMessage(s, i, content, logger)
+}
+
+// createResponseMessage は操作結果に基づいてレスポンスメッセージを作成する
+func (c *MonitorCommand) createResponseMessage(serviceName string, result ServiceOperationResult) string {
+	if result.Err != nil {
+		formattedName := FormatServiceName(serviceName)
+		errorMsg := fmt.Sprintf("❌ %s の%sに失敗しました: %v", formattedName, result.ErrorPrefix, result.Err)
+		return errorMsg
+	}
+	return result.SuccessMessage
+}
+
+// logOperationResult は操作結果をログに記録する
+func (c *MonitorCommand) logOperationResult(serviceName string, isStart bool, err error, logger logging.Logger) {
 	if err != nil {
-		content = fmt.Sprintf("❌ %s の%sに失敗しました: %v", FormatServiceName(serviceName), errorPrefix, err)
 		logger.Error(c.ctx, "Service operation failed",
 			logging.String("service", serviceName),
 			logging.Bool("start", isStart),
 			logging.ErrorField(err))
 	} else {
-		content = successMessage
 		logger.Info(c.ctx, "Service operation succeeded",
 			logging.String("service", serviceName),
 			logging.Bool("start", isStart))
 	}
+}
 
-	// フォローアップメッセージを送信
-	_, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+// sendFollowupMessage はDiscordにフォローアップメッセージを送信する
+func (c *MonitorCommand) sendFollowupMessage(
+	s *discordgo.Session,
+	i *discordgo.InteractionCreate,
+	content string,
+	logger logging.Logger,
+) {
+	_, err := s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 		Content: content,
 	})
 	if err != nil {

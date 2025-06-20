@@ -48,16 +48,14 @@ linters:
     - godox
     - wsl
     - mnd
-    - funlen  # 複雑な実装では制限が厳しすぎるため無効化
-    - lll     # 行の長さ制限を緩和
     # v2で削除されたlinter: gosimple, stylecheck (staticcheckに統合)
 
 linters-settings:
   dupl:
     threshold: 100
   funlen:
-    lines: 150
-    statements: 100
+    lines: 60
+    statements: 50
   goconst:
     min-len: 2
     min-occurrences: 2
@@ -80,7 +78,7 @@ linters-settings:
     enable:
       - shadow
   lll:
-    line-length: 160
+    line-length: 120
   misspell:
     locale: US
   nolintlint:
@@ -93,20 +91,19 @@ linters-settings:
 issues:
   exclude-rules:
     # テストファイルでは一部のリンターを無効化
-    - path: _test\.go
+    - path: '_test\.go$'
       linters:
         - funlen
+        - lll
         - dupl
         - gocyclo
         - errcheck
-        - lll
         - gosec
 
-    # main関数では一部のリンターを無効化
-    - path: cmd/
+    # main関数では一部のリンターを無効化（DI/初期化コードのため）
+    - path: 'cmd/'
       linters:
         - gochecknoinits
-        - funlen
 
     # モックファイルでは厳密なチェックを無効化
     - path: mock
@@ -114,16 +111,6 @@ issues:
         - dupl
         - funlen
 
-    # 長い関数（複雑な実装を含む）での例外
-    - path: internal/bot/command/
-      linters:
-        - funlen
-    - path: pkg/docker/
-      linters:
-        - funlen
-    - path: pkg/logging/
-      linters:
-        - funlen
 
   # 既知の問題を除外
   exclude:

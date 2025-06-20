@@ -156,20 +156,40 @@ func (s *DefaultComposeService) ListGameContainers(composePath string) ([]Contai
 
 // StartService starts a specific service
 func (s *DefaultComposeService) StartService(composePath, serviceName string) error {
-	return s.executeServiceOperation(composePath, serviceName, "start", func(ctx context.Context, c container.Summary) error {
-		return s.client.ContainerStart(ctx, c.ID, container.StartOptions{})
-	})
+	return s.executeServiceOperation(composePath, serviceName, "start",
+		func(ctx context.Context, c container.Summary) error {
+			return s.client.ContainerStart(ctx, c.ID, container.StartOptions{})
+		})
 }
 
 // StopService stops a specific service
 func (s *DefaultComposeService) StopService(composePath, serviceName string) error {
-	return s.executeServiceOperation(composePath, serviceName, "stop", func(ctx context.Context, c container.Summary) error {
-		return s.client.ContainerStop(ctx, c.ID, container.StopOptions{})
-	})
+	return s.executeServiceOperation(composePath, serviceName, "stop",
+		func(ctx context.Context, c container.Summary) error {
+			return s.client.ContainerStop(ctx, c.ID, container.StopOptions{})
+		})
 }
 
 // GetContainerStats gets resource usage stats for a specific container
 func (s *DefaultComposeService) GetContainerStats(containerName string) (*ContainerStats, error) {
+	// コンテナを名前で検索
+	containerSummary, err := s.findContainerByName(containerName)
+	if err != nil {
+		return nil, err
+	}
+
+	// 統計情報を取得
+	stats, err := s.getContainerStatsData(containerSummary.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 統計情報を計算
+	return s.calculateContainerStats(containerSummary, stats), nil
+}
+
+// findContainerByName finds a container by its name
+func (s *DefaultComposeService) findContainerByName(containerName string) (*container.Summary, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), QueryOperationTimeout)
 	defer cancel()
 
@@ -188,8 +208,16 @@ func (s *DefaultComposeService) GetContainerStats(containerName string) (*Contai
 		return nil, fmt.Errorf("container %s not found", containerName)
 	}
 
+	return &containers[0], nil
+}
+
+// getContainerStatsData retrieves and parses container stats from Docker API
+func (s *DefaultComposeService) getContainerStatsData(containerID string) (*container.StatsResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), QueryOperationTimeout)
+	defer cancel()
+
 	// Stats APIを呼び出し
-	statsResponse, err := s.client.ContainerStats(ctx, containers[0].ID, false)
+	statsResponse, err := s.client.ContainerStats(ctx, containerID, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container stats: %w", err)
 	}
@@ -211,24 +239,60 @@ func (s *DefaultComposeService) GetContainerStats(containerName string) (*Contai
 		return nil, fmt.Errorf("failed to parse stats: %w", err)
 	}
 
+	return &stats, nil
+}
+
+// calculateContainerStats calculates all container statistics and returns ContainerStats
+func (s *DefaultComposeService) calculateContainerStats(
+	containerSummary *container.Summary, stats *container.StatsResponse) *ContainerStats {
 	// CPU使用率を計算
-	cpuPercent := calculateCPUPercent(&stats)
+	cpuPercent := calculateCPUPercent(stats)
 
 	// メモリ使用率を計算
-	memPercent := float64(stats.MemoryStats.Usage) / float64(stats.MemoryStats.Limit) * 100.0
-	memUsage := fmt.Sprintf("%.2fGiB / %.2fGiB",
-		float64(stats.MemoryStats.Usage)/1024/1024/1024,
-		float64(stats.MemoryStats.Limit)/1024/1024/1024)
+	memPercent := s.calculateMemoryPercent(stats)
+	memUsage := s.formatMemoryUsage(stats)
 
 	// ネットワークI/Oを計算
+	networkIO := s.calculateNetworkIO(stats)
+
+	// ブロックI/Oを計算
+	blockIO := s.calculateBlockIO(stats)
+
+	return &ContainerStats{
+		ContainerID:   containerSummary.ID[:12],
+		Name:          strings.TrimPrefix(containerSummary.Names[0], "/"),
+		CPUPercent:    cpuPercent,
+		MemoryPercent: memPercent,
+		MemoryUsage:   memUsage,
+		NetworkIO:     networkIO,
+		BlockIO:       blockIO,
+	}
+}
+
+// calculateMemoryPercent calculates memory usage percentage
+func (s *DefaultComposeService) calculateMemoryPercent(stats *container.StatsResponse) float64 {
+	return float64(stats.MemoryStats.Usage) / float64(stats.MemoryStats.Limit) * 100.0
+}
+
+// formatMemoryUsage formats memory usage as "used / total"
+func (s *DefaultComposeService) formatMemoryUsage(stats *container.StatsResponse) string {
+	return fmt.Sprintf("%.2fGiB / %.2fGiB",
+		float64(stats.MemoryStats.Usage)/1024/1024/1024,
+		float64(stats.MemoryStats.Limit)/1024/1024/1024)
+}
+
+// calculateNetworkIO calculates network I/O statistics
+func (s *DefaultComposeService) calculateNetworkIO(stats *container.StatsResponse) string {
 	var rxBytes, txBytes uint64
 	for _, v := range stats.Networks {
 		rxBytes += v.RxBytes
 		txBytes += v.TxBytes
 	}
-	networkIO := fmt.Sprintf("%s / %s", formatBytes(rxBytes), formatBytes(txBytes))
+	return fmt.Sprintf("%s / %s", formatBytes(rxBytes), formatBytes(txBytes))
+}
 
-	// ブロックI/Oを計算
+// calculateBlockIO calculates block I/O statistics
+func (s *DefaultComposeService) calculateBlockIO(stats *container.StatsResponse) string {
 	var readBytes, writeBytes uint64
 	for _, v := range stats.BlkioStats.IoServiceBytesRecursive {
 		switch v.Op {
@@ -238,17 +302,7 @@ func (s *DefaultComposeService) GetContainerStats(containerName string) (*Contai
 			writeBytes += v.Value
 		}
 	}
-	blockIO := fmt.Sprintf("%s / %s", formatBytes(readBytes), formatBytes(writeBytes))
-
-	return &ContainerStats{
-		ContainerID:   containers[0].ID[:12],
-		Name:          strings.TrimPrefix(containers[0].Names[0], "/"),
-		CPUPercent:    cpuPercent,
-		MemoryPercent: memPercent,
-		MemoryUsage:   memUsage,
-		NetworkIO:     networkIO,
-		BlockIO:       blockIO,
-	}, nil
+	return fmt.Sprintf("%s / %s", formatBytes(readBytes), formatBytes(writeBytes))
 }
 
 // GetAllContainersStats gets resource usage stats for all containers
@@ -306,9 +360,10 @@ func (s *DefaultComposeService) executeServiceOperation(composePath, serviceName
 
 // RestartContainer restarts a specific container
 func (s *DefaultComposeService) RestartContainer(composePath, serviceName string) error {
-	return s.executeServiceOperation(composePath, serviceName, "restart", func(ctx context.Context, c container.Summary) error {
-		return s.client.ContainerRestart(ctx, c.ID, container.StopOptions{})
-	})
+	return s.executeServiceOperation(composePath, serviceName, "restart",
+		func(ctx context.Context, c container.Summary) error {
+			return s.client.ContainerRestart(ctx, c.ID, container.StopOptions{})
+		})
 }
 
 // GetContainerLogs gets logs from a specific container

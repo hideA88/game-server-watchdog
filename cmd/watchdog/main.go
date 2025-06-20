@@ -23,7 +23,7 @@ var (
 	builtBy = "unknown"
 )
 
-func main() {
+func main() { //nolint:funlen // DI/初期化処理のため長い関数を許可
 	// バージョン情報の表示（--versionオプション）
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
 		fmt.Printf("Game Server Watchdog %s\n", version)

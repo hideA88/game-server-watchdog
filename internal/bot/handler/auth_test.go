@@ -6,7 +6,7 @@ import (
 	"github.com/hideA88/game-server-watchdog/config"
 )
 
-func TestIsAuthorized(t *testing.T) {
+func TestIsAuthorized(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
 	t.Parallel()
 	tests := []struct {
 		name           string

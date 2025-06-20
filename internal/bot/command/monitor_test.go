@@ -54,7 +54,7 @@ func TestMonitorCommand_Description(t *testing.T) {
 	}
 }
 
-func TestMonitorCommand_Execute(t *testing.T) {
+func TestMonitorCommand_Execute(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
 	tests := []struct {
 		name           string
 		systemInfo     *system.SystemInfo
@@ -216,7 +216,7 @@ func TestMonitorCommand_Execute(t *testing.T) {
 	}
 }
 
-func TestMonitorCommand_GetComponents(t *testing.T) {
+func TestMonitorCommand_GetComponents(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
 	tests := []struct {
 		name        string
 		containers  []docker.ContainerInfo

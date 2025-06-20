@@ -9,7 +9,7 @@ import (
 	"github.com/hideA88/game-server-watchdog/pkg/logging"
 )
 
-func TestLoad(t *testing.T) {
+func TestLoad(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
 	// Temporarily rename .env file if it exists
 	if _, err := os.Stat(".env"); err == nil {
 		if err := os.Rename(".env", ".env.test.bak"); err != nil {
@@ -328,7 +328,7 @@ func createTestEnvFile(t *testing.T, content string) func() {
 	}
 }
 
-func TestLoad_WithEnvFile(t *testing.T) {
+func TestLoad_WithEnvFile(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
 	// 既存の.envファイルを一時的にリネーム
 	if _, err := os.Stat(".env"); err == nil {
 		if err := os.Rename(".env", ".env.test.bak"); err != nil {

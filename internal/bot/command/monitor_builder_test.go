@@ -59,7 +59,7 @@ func TestMonitorCommand_buildSystemInfo(t *testing.T) {
 	}
 }
 
-func TestMonitorCommand_checkAlerts(t *testing.T) {
+func TestMonitorCommand_checkAlerts(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
 	tests := []struct {
 		name       string
 		sysInfo    *system.SystemInfo
