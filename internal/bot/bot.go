@@ -14,13 +14,19 @@ import (
 	"github.com/hideA88/game-server-watchdog/pkg/system"
 )
 
+// Bot represents a Discord bot instance
 type Bot struct {
 	session *discordgo.Session
 	config  *config.Config
 }
 
 // New は新しいBotインスタンスを作成します
-func New(ctx context.Context, config *config.Config, monitor system.Monitor, compose docker.ComposeService) (*Bot, error) {
+func New(
+	ctx context.Context,
+	config *config.Config,
+	monitor system.Monitor,
+	compose docker.ComposeService,
+) (*Bot, error) {
 	session, err := discordgo.New("Bot " + config.DiscordToken)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Discord session: %w", err)
@@ -39,6 +45,7 @@ func New(ctx context.Context, config *config.Config, monitor system.Monitor, com
 	return bot, nil
 }
 
+// Start starts the Discord bot session
 func (b *Bot) Start(ctx context.Context) error {
 	// セッションを開く
 	if err := b.session.Open(); err != nil {
@@ -50,6 +57,7 @@ func (b *Bot) Start(ctx context.Context) error {
 	return nil
 }
 
+// Stop stops the Discord bot session
 func (b *Bot) Stop() {
 	// Discordセッションを閉じる
 	_ = b.session.Close()

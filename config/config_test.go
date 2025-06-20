@@ -113,7 +113,7 @@ func TestLoad(t *testing.T) {
 			wantErr: false,
 			setupFunc: func() {
 				// .envファイルが存在しないことを確認
-				os.Remove(".env")
+				_ = os.Remove(".env")
 			},
 		},
 		{
@@ -254,10 +254,14 @@ func TestLoad(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// 既存の環境変数を保存
 			originalEnv := make(map[string]string)
-			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "LOG_LEVEL", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS", "DOCKER_COMPOSE_PATH", "DOCKER_COMPOSE_PROJECT_NAME"}
+			envKeys := []string{
+				"DISCORD_TOKEN", "DEBUG_MODE", "LOG_LEVEL",
+				"ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS",
+				"DOCKER_COMPOSE_PATH", "DOCKER_COMPOSE_PROJECT_NAME",
+			}
 			for _, key := range envKeys {
 				originalEnv[key] = os.Getenv(key)
-				os.Unsetenv(key)
+				_ = os.Unsetenv(key)
 			}
 
 			// setup
@@ -267,7 +271,7 @@ func TestLoad(t *testing.T) {
 
 			// テスト用の環境変数を設定
 			for key, value := range tt.envVars {
-				os.Setenv(key, value)
+				_ = os.Setenv(key, value)
 			}
 
 			// テスト実行
@@ -276,9 +280,9 @@ func TestLoad(t *testing.T) {
 			// クリーンアップ
 			for key, value := range originalEnv {
 				if value == "" {
-					os.Unsetenv(key)
+					_ = os.Unsetenv(key)
 				} else {
-					os.Setenv(key, value)
+					_ = os.Setenv(key, value)
 				}
 			}
 
@@ -308,7 +312,7 @@ func createTestEnvFile(t *testing.T, content string) func() {
 	hasBackup := err == nil
 
 	// テスト用の.envファイルを作成
-	if err := os.WriteFile(".env", []byte(content), 0644); err != nil {
+	if err := os.WriteFile(".env", []byte(content), 0600); err != nil {
 		t.Fatalf("Failed to create test .env file: %v", err)
 	}
 
@@ -316,10 +320,10 @@ func createTestEnvFile(t *testing.T, content string) func() {
 	return func() {
 		if hasBackup {
 			// バックアップを復元
-			_ = os.WriteFile(".env", data, 0644)
+			_ = os.WriteFile(".env", data, 0600)
 		} else {
 			// .envファイルを削除
-			os.Remove(".env")
+			_ = os.Remove(".env")
 		}
 	}
 }
@@ -366,11 +370,15 @@ ALLOWED_USER_IDS=987654321098765432,987654321098765433`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 環境変数をクリア
-			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "LOG_LEVEL", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS", "DOCKER_COMPOSE_PATH", "DOCKER_COMPOSE_PROJECT_NAME"}
+			envKeys := []string{
+				"DISCORD_TOKEN", "DEBUG_MODE", "LOG_LEVEL",
+				"ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS",
+				"DOCKER_COMPOSE_PATH", "DOCKER_COMPOSE_PROJECT_NAME",
+			}
 			originalEnv := make(map[string]string)
 			for _, key := range envKeys {
 				originalEnv[key] = os.Getenv(key)
-				os.Unsetenv(key)
+				_ = os.Unsetenv(key)
 			}
 
 			// テスト用の.envファイルを作成
@@ -383,9 +391,9 @@ ALLOWED_USER_IDS=987654321098765432,987654321098765433`,
 			// 環境変数を復元
 			for key, value := range originalEnv {
 				if value == "" {
-					os.Unsetenv(key)
+					_ = os.Unsetenv(key)
 				} else {
-					os.Setenv(key, value)
+					_ = os.Setenv(key, value)
 				}
 			}
 

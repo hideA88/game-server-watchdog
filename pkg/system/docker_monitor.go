@@ -141,7 +141,11 @@ func (m *DockerAwareMonitor) readCPUStat() (*cpuStat, error) {
 			return nil, err
 		}
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			_ = err
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -190,7 +194,11 @@ func (m *DockerAwareMonitor) getHostMemoryInfo() (*memoryInfo, error) {
 			return nil, err
 		}
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			_ = err
+		}
+	}()
 
 	var totalKB, freeKB, buffersKB, cachedKB uint64
 

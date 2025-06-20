@@ -14,6 +14,7 @@ import (
 	"github.com/hideA88/game-server-watchdog/pkg/system"
 )
 
+// CommandHandler represents a command handler with its function
 type CommandHandler struct {
 	Cmd         command.Command
 	SendMsgFunc sendMessageFunc

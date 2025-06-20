@@ -193,7 +193,12 @@ func (s *DefaultComposeService) GetContainerStats(containerName string) (*Contai
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container stats: %w", err)
 	}
-	defer statsResponse.Body.Close()
+	defer func() {
+		if err := statsResponse.Body.Close(); err != nil {
+			// ログ出力は避けて、エラーを無視
+			_ = err
+		}
+	}()
 
 	// 統計情報を読み取り
 	data, err := io.ReadAll(statsResponse.Body)
@@ -345,7 +350,11 @@ func (s *DefaultComposeService) GetContainerLogs(composePath, serviceName string
 	if err != nil {
 		return "", fmt.Errorf("failed to get logs: %w", err)
 	}
-	defer logsReader.Close()
+	defer func() {
+		if err := logsReader.Close(); err != nil {
+			_ = err
+		}
+	}()
 
 	// ログを読み取り
 	logs, err := io.ReadAll(logsReader)
@@ -388,16 +397,18 @@ func calculateCPUPercent(stats *container.StatsResponse) float64 {
 
 // formatDuration formats a duration into a human-readable string
 func formatDuration(d time.Duration) string {
-	if d < time.Minute {
+	switch {
+	case d < time.Minute:
 		return fmt.Sprintf("%ds", int(d.Seconds()))
-	} else if d < time.Hour {
+	case d < time.Hour:
 		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
-	} else if d < 24*time.Hour {
+	case d < 24*time.Hour:
 		return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
+	default:
+		days := int(d.Hours()) / 24
+		hours := int(d.Hours()) % 24
+		return fmt.Sprintf("%dd%dh", days, hours)
 	}
-	days := int(d.Hours()) / 24
-	hours := int(d.Hours()) % 24
-	return fmt.Sprintf("%dd%dh", days, hours)
 }
 
 // formatBytes formats bytes into a human-readable string

@@ -90,7 +90,11 @@ func main() {
 	defer discordBot.Stop()
 
 	// Docker APIクライアントのクリーンアップ
-	defer compose.Close()
+	defer func() {
+		if err := compose.Close(); err != nil {
+			logger.Error(ctx, "Failed to close Docker client", logging.ErrorField(err))
+		}
+	}()
 
 	// シグナル待ち
 	sc := make(chan os.Signal, 1)

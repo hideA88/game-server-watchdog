@@ -35,7 +35,10 @@ func (c *MonitorCommand) buildSystemInfo(sysInfo *system.SystemInfo) string {
 }
 
 // buildContainerTable はコンテナテーブルを生成する
-func (c *MonitorCommand) buildContainerTable(containers []docker.ContainerInfo, statsMap map[string]*docker.ContainerStats) string {
+func (c *MonitorCommand) buildContainerTable(
+	containers []docker.ContainerInfo,
+	statsMap map[string]*docker.ContainerStats,
+) string {
 	var builder strings.Builder
 	builder.WriteString("\n📦 **コンテナ状況**\n")
 	builder.WriteString("```\n")
@@ -59,7 +62,10 @@ func (c *MonitorCommand) buildContainerTable(containers []docker.ContainerInfo, 
 }
 
 // formatContainerRow は1行分のコンテナ情報をフォーマットする
-func (c *MonitorCommand) formatContainerRow(container *docker.ContainerInfo, statsMap map[string]*docker.ContainerStats) string {
+func (c *MonitorCommand) formatContainerRow(
+	container *docker.ContainerInfo,
+	statsMap map[string]*docker.ContainerStats,
+) string {
 	// サービス名（最大17文字）
 	serviceName := container.Service
 	if len(serviceName) > 15 {

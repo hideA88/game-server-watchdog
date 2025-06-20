@@ -50,7 +50,12 @@ type MonitorCommand struct {
 }
 
 // NewMonitorCommand creates a new MonitorCommand
-func NewMonitorCommand(ctx context.Context, compose docker.ComposeService, monitor system.Monitor, composePath string) *MonitorCommand {
+func NewMonitorCommand(
+	ctx context.Context,
+	compose docker.ComposeService,
+	monitor system.Monitor,
+	composePath string,
+) *MonitorCommand {
 	if composePath == "" {
 		composePath = defaultComposePath
 	}
@@ -302,7 +307,8 @@ func (c *MonitorCommand) GetComponents(_ []string) ([]discordgo.MessageComponent
 			break
 		}
 		// 停止中のコンテナに対しては起動ボタンを追加
-		if strings.EqualFold(containers[i].State, containerStateStopped) || strings.EqualFold(containers[i].State, containerStateExited) {
+		if strings.EqualFold(containers[i].State, containerStateStopped) ||
+			strings.EqualFold(containers[i].State, containerStateExited) {
 			button := discordgo.Button{
 				Label:    fmt.Sprintf("🚀 %s を起動", FormatServiceName(containers[i].Service)),
 				Style:    discordgo.SuccessButton,
@@ -363,13 +369,14 @@ func (c *MonitorCommand) HandleInteraction(s *discordgo.Session, i *discordgo.In
 	var serviceName string
 	var isStart bool
 
-	if strings.HasPrefix(data.CustomID, "start_service_") {
+	switch {
+	case strings.HasPrefix(data.CustomID, "start_service_"):
 		serviceName = strings.TrimPrefix(data.CustomID, "start_service_")
 		isStart = true
-	} else if strings.HasPrefix(data.CustomID, "stop_service_") {
+	case strings.HasPrefix(data.CustomID, "stop_service_"):
 		serviceName = strings.TrimPrefix(data.CustomID, "stop_service_")
 		isStart = false
-	} else {
+	default:
 		return fmt.Errorf("unknown custom ID: %s", data.CustomID)
 	}
 

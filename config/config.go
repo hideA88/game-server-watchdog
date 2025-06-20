@@ -14,6 +14,7 @@ import (
 	"github.com/hideA88/game-server-watchdog/pkg/logging"
 )
 
+// Config holds the application configuration
 type Config struct {
 	DiscordToken             string        `envconfig:"DISCORD_TOKEN" required:"true"`
 	DebugMode                bool          `envconfig:"DEBUG_MODE" default:"false"`
