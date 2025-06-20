@@ -33,6 +33,16 @@
 - `@bot restart <サービス名>`: コンテナを再起動
 - `@bot logs <サービス名> [行数]`: コンテナのログを表示
 
+## 開発環境
+
+### Goバージョン
+- **Go 1.24** を使用（2025年6月時点の最新版）
+- GitHub ActionsでもGo 1.24を使用
+
+### 依存ツール
+- **golangci-lint v2.1.6** を使用
+- GitHub Actionsでは **golangci-lint-action@v7** を使用（v2サポートのため）
+
 ## 開発時の注意事項
 
 ### コード品質管理
