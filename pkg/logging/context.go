@@ -1,3 +1,4 @@
+// Package logging は構造化ロギングのための統一的なインターフェースを提供します
 package logging
 
 import (

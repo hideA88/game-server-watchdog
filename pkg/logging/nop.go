@@ -1,3 +1,4 @@
+// Package logging は構造化ロギングのための統一的なインターフェースを提供します
 package logging
 
 import (
@@ -13,23 +14,23 @@ func newNopLogger() Logger {
 }
 
 // Debug は何もしない
-func (n *nopLogger) Debug(ctx context.Context, msg string, fields ...Field) {}
+func (n *nopLogger) Debug(_ context.Context, _ string, _ ...Field) {}
 
 // Info は何もしない
-func (n *nopLogger) Info(ctx context.Context, msg string, fields ...Field) {}
+func (n *nopLogger) Info(_ context.Context, _ string, _ ...Field) {}
 
 // Warn は何もしない
-func (n *nopLogger) Warn(ctx context.Context, msg string, fields ...Field) {}
+func (n *nopLogger) Warn(_ context.Context, _ string, _ ...Field) {}
 
 // Error は何もしない
-func (n *nopLogger) Error(ctx context.Context, msg string, fields ...Field) {}
+func (n *nopLogger) Error(_ context.Context, _ string, _ ...Field) {}
 
 // With は自身を返す
-func (n *nopLogger) With(fields ...Field) Logger {
+func (n *nopLogger) With(_ ...Field) Logger {
 	return n
 }
 
 // Named は自身を返す
-func (n *nopLogger) Named(name string) Logger {
+func (n *nopLogger) Named(_ string) Logger {
 	return n
 }

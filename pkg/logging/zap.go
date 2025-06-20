@@ -1,3 +1,4 @@
+// Package logging は構造化ロギングのための統一的なインターフェースを提供します
 package logging
 
 import (
@@ -6,6 +7,13 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+)
+
+const (
+	// logFormatConsole はコンソール形式のログフォーマット
+	logFormatConsole = "console"
+	// logFormatJSON はJSON形式のログフォーマット
+	logFormatJSON = "json"
 )
 
 // zapLogger はzapを使ったLogger実装
@@ -25,10 +33,10 @@ func newZapLogger(config *Config) (Logger, error) {
 	zapConfig.Level = zap.NewAtomicLevelAt(convertToZapLevel(config.Level))
 
 	// エンコーディングの設定
-	if config.Format == "console" {
-		zapConfig.Encoding = "console"
+	if config.Format == logFormatConsole {
+		zapConfig.Encoding = logFormatConsole
 	} else {
-		zapConfig.Encoding = "json"
+		zapConfig.Encoding = logFormatJSON
 	}
 
 	// 出力先の設定
@@ -93,20 +101,20 @@ func convertFieldsToZap(fields []Field) []zap.Field {
 }
 
 // ログレベル実装（コンテキスト付き）
-func (l *zapLogger) Debug(ctx context.Context, msg string, fields ...Field) {
+func (l *zapLogger) Debug(_ context.Context, msg string, fields ...Field) {
 	// 将来的にはコンテキストからトレースIDなどを抽出可能
 	l.logger.Debug(msg, convertFieldsToZap(fields)...)
 }
 
-func (l *zapLogger) Info(ctx context.Context, msg string, fields ...Field) {
+func (l *zapLogger) Info(_ context.Context, msg string, fields ...Field) {
 	l.logger.Info(msg, convertFieldsToZap(fields)...)
 }
 
-func (l *zapLogger) Warn(ctx context.Context, msg string, fields ...Field) {
+func (l *zapLogger) Warn(_ context.Context, msg string, fields ...Field) {
 	l.logger.Warn(msg, convertFieldsToZap(fields)...)
 }
 
-func (l *zapLogger) Error(ctx context.Context, msg string, fields ...Field) {
+func (l *zapLogger) Error(_ context.Context, msg string, fields ...Field) {
 	l.logger.Error(msg, convertFieldsToZap(fields)...)
 }
 

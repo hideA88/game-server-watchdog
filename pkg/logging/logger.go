@@ -1,3 +1,4 @@
+// Package logging は構造化ロギングのための統一的なインターフェースを提供します
 package logging
 
 import (
@@ -27,42 +28,52 @@ type Field struct {
 	Value interface{}
 }
 
-// 便利なフィールド生成関数
+// String はstring型のフィールドを作成します
 func String(key, value string) Field {
 	return Field{Key: key, Value: value}
 }
 
+// Int はint型のフィールドを作成します
 func Int(key string, value int) Field {
 	return Field{Key: key, Value: value}
 }
 
+// Int64 はint64型のフィールドを作成します
 func Int64(key string, value int64) Field {
 	return Field{Key: key, Value: value}
 }
 
+// Float64 はfloat64型のフィールドを作成します
 func Float64(key string, value float64) Field {
 	return Field{Key: key, Value: value}
 }
 
+// Bool はbool型のフィールドを作成します
 func Bool(key string, value bool) Field {
 	return Field{Key: key, Value: value}
 }
 
+// ErrorField はerror型のフィールドを作成します
 func ErrorField(err error) Field {
 	return Field{Key: "error", Value: err}
 }
 
+// Any は任意の型のフィールドを作成します
 func Any(key string, value interface{}) Field {
 	return Field{Key: key, Value: value}
 }
 
-// ログレベル定義
+// Level はログレベルを表す型です
 type Level int
 
 const (
+	// DebugLevel はデバッグレベルを表します
 	DebugLevel Level = iota
+	// InfoLevel は情報レベルを表します
 	InfoLevel
+	// WarnLevel は警告レベルを表します
 	WarnLevel
+	// ErrorLevel はエラーレベルを表します
 	ErrorLevel
 )
 
