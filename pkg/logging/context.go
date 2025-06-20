@@ -25,12 +25,3 @@ func FromContext(ctx context.Context) Logger {
 	// contextにロガーがない場合はnopロガーを返す
 	return newNopLogger()
 }
-
-// MustFromContext はcontextからロガーを取得する
-// ロガーが存在しない場合はpanicする
-func MustFromContext(ctx context.Context) Logger {
-	if logger, ok := ctx.Value(loggerKey).(Logger); ok {
-		return logger
-	}
-	panic("logger not found in context")
-}
