@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 // CommandExecutor is an interface for executing commands
 type CommandExecutor interface {
 	Output(name string, args ...string) ([]byte, error)
+	OutputContext(ctx context.Context, name string, args ...string) ([]byte, error)
 	LookPath(file string) (string, error)
 }
 
@@ -20,6 +22,12 @@ type RealCommandExecutor struct{}
 // Output executes a command and returns its output
 func (e *RealCommandExecutor) Output(name string, args ...string) ([]byte, error) {
 	cmd := exec.Command(name, args...)
+	return cmd.Output()
+}
+
+// OutputContext executes a command with context and returns its output
+func (e *RealCommandExecutor) OutputContext(ctx context.Context, name string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
 	return cmd.Output()
 }
 
@@ -83,7 +91,11 @@ func (s *DefaultComposeService) ListContainers(composePath string) ([]ContainerI
 
 	// Parse JSON output line by line
 	var containers []ContainerInfo
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	trimmedOutput := strings.TrimSpace(string(output))
+	if trimmedOutput == "" {
+		return containers, nil
+	}
+	lines := strings.Split(trimmedOutput, "\n")
 
 	for _, line := range lines {
 		if line == "" {
@@ -129,4 +141,78 @@ func (s *DefaultComposeService) ListContainers(composePath string) ([]ContainerI
 	}
 
 	return containers, nil
+}
+
+// StartService starts a specific service using docker compose
+func (s *DefaultComposeService) StartService(composePath string, serviceName string) error {
+	// Validate service name for security
+	if !IsValidServiceName(serviceName) {
+		return fmt.Errorf("%w: %s", ErrInvalidServiceName, serviceName)
+	}
+	
+	// Validate compose file path
+	if composePath == "" {
+		composePath = "docker-compose.yml"
+	}
+
+	absPath, err := filepath.Abs(composePath)
+	if err != nil {
+		return fmt.Errorf("invalid compose path: %w", err)
+	}
+
+	// Run docker compose start command for specific service with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), ServiceOperationTimeout)
+	defer cancel()
+	
+	output, err := s.executor.OutputContext(ctx, "docker", "compose", "-f", absPath, "start", serviceName)
+	if err != nil {
+		// Check if it's a timeout
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("start service %s timeout after %v", serviceName, ServiceOperationTimeout)
+		}
+		// Check if docker is installed
+		if _, err := s.executor.LookPath("docker"); err != nil {
+			return fmt.Errorf("docker not found: %w", err)
+		}
+		return fmt.Errorf("failed to start service %s: %w (output: %s)", serviceName, err, string(output))
+	}
+
+	return nil
+}
+
+// StopService stops a specific service using docker compose
+func (s *DefaultComposeService) StopService(composePath string, serviceName string) error {
+	// Validate service name for security
+	if !IsValidServiceName(serviceName) {
+		return fmt.Errorf("%w: %s", ErrInvalidServiceName, serviceName)
+	}
+	
+	// Validate compose file path
+	if composePath == "" {
+		composePath = "docker-compose.yml"
+	}
+
+	absPath, err := filepath.Abs(composePath)
+	if err != nil {
+		return fmt.Errorf("invalid compose path: %w", err)
+	}
+
+	// Run docker compose stop command for specific service with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), ServiceOperationTimeout)
+	defer cancel()
+	
+	output, err := s.executor.OutputContext(ctx, "docker", "compose", "-f", absPath, "stop", serviceName)
+	if err != nil {
+		// Check if it's a timeout
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("stop service %s timeout after %v", serviceName, ServiceOperationTimeout)
+		}
+		// Check if docker is installed
+		if _, err := s.executor.LookPath("docker"); err != nil {
+			return fmt.Errorf("docker not found: %w", err)
+		}
+		return fmt.Errorf("failed to stop service %s: %w (output: %s)", serviceName, err, string(output))
+	}
+
+	return nil
 }

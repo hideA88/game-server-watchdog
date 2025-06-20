@@ -20,4 +20,8 @@ type ContainerInfo struct {
 type ComposeService interface {
 	// ListContainers returns a list of containers managed by docker-compose
 	ListContainers(composePath string) ([]ContainerInfo, error)
+	// StartService starts a specific service
+	StartService(composePath string, serviceName string) error
+	// StopService stops a specific service
+	StopService(composePath string, serviceName string) error
 }
