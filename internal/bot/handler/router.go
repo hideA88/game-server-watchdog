@@ -31,9 +31,9 @@ func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, content strin
 
 // Router はメッセージをルーティングして適切なコマンドに振り分ける
 type Router struct {
-	config               *config.Config
-	commands             map[string]*CommandHandler
-	interactionHandlers  []command.InteractionHandler
+	config              *config.Config
+	commands            map[string]*CommandHandler
+	interactionHandlers []command.InteractionHandler
 }
 
 // NewRouter は新しいルーターを作成し、コマンドを登録
@@ -49,17 +49,25 @@ func NewRouter(cfg *config.Config, monitor system.Monitor, compose docker.Compos
 	helpCmd := command.NewHelpCommand()
 	statusCmd := command.NewStatusCommand(monitor)
 	gameInfoCmd := command.NewGameInfoCommand(compose, cfg.DockerComposePath)
+	monitorCmd := command.NewMonitorCommand(compose, monitor, cfg.DockerComposePath)
+	containerCmd := command.NewContainerCommand(compose, cfg.DockerComposePath)
+	restartCmd := command.NewRestartCommand(compose, cfg.DockerComposePath)
+	logsCmd := command.NewLogsCommand(compose, cfg.DockerComposePath)
 
 	r.RegisterCommand(pingCmd, sendMessage)
 	r.RegisterCommand(helpCmd, sendMessage)
 	r.RegisterCommand(statusCmd, sendMessage)
 	r.RegisterCommand(gameInfoCmd, sendMessage)
+	r.RegisterCommand(monitorCmd, sendMessage)
+	r.RegisterCommand(containerCmd, sendMessage)
+	r.RegisterCommand(restartCmd, sendMessage)
+	r.RegisterCommand(logsCmd, sendMessage)
 
 	// インタラクションハンドラーを登録
 	r.RegisterInteractionHandler(gameInfoCmd)
 
 	// helpコマンドに利用可能なコマンドを設定
-	commands := []command.Command{pingCmd, helpCmd, statusCmd, gameInfoCmd}
+	commands := []command.Command{pingCmd, helpCmd, statusCmd, gameInfoCmd, monitorCmd, containerCmd, restartCmd, logsCmd}
 	helpCmd.SetCommands(commands)
 
 	return r
@@ -169,7 +177,7 @@ func (r *Router) Handle(s *discordgo.Session, m *discordgo.MessageCreate) {
 				components = comps
 			}
 		}
-		
+
 		if _, err := handler.SendMsgFunc(s, m, result, components); err != nil {
 			log.Printf("メッセージの送信に失敗しました: %v", err)
 			_, _ = s.ChannelMessageSend(m.ChannelID, "メッセージの送信中にエラーが発生しました。")
@@ -219,9 +227,7 @@ func (r *Router) HandleInteraction(s *discordgo.Session, i *discordgo.Interactio
 			return
 		}
 	}
-	
+
 	// 未知のインタラクション
 	log.Printf("Unknown interaction custom ID: %s", data.CustomID)
 }
-
-
