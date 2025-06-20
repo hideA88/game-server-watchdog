@@ -8,7 +8,7 @@ fmt: format ## コードをフォーマット(formatのエイリアス)
 .PHONY: format
 format: ## コードをフォーマット
 	@echo "Running goimports..."
-	@goimports -w .
+	@goimports -local github.com/hideA88/game-server-watchdog -w .
 	@echo "Running go fmt..."
 	@go fmt ./...
 

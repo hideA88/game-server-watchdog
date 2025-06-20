@@ -1,0 +1,124 @@
+run:
+  timeout: 5m
+  tests: true
+  build-tags:
+    - integration
+
+linters:
+  enable:
+    - bodyclose
+    - dogsled
+    - dupl
+    - errcheck
+    - copyloopvar  # exportlooprefの代替
+    - funlen
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - noctx
+    - nolintlint
+    - revive
+    - staticcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace
+
+  disable:
+    - gochecknoglobals # グローバル変数を許可
+    - godox # TODO/FIXMEコメントを許可
+    - wsl # 空行の厳密なチェックを無効化
+    - mnd # マジックナンバーの検出を無効化（自明な値が多いため）
+
+linters-settings:
+  dupl:
+    threshold: 100
+  funlen:
+    lines: 100
+    statements: 50
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport # https://github.com/go-critic/go-critic/issues/845
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+      - wrapperFunc
+  gocyclo:
+    min-complexity: 15
+  goimports:
+    local-prefixes: github.com/hideA88/game-server-watchdog
+  govet:
+    enable:
+      - shadow
+  lll:
+    line-length: 140
+  misspell:
+    locale: US
+  nolintlint:
+    allow-leading-space: true # don't require machine-readable nolint directives (i.e. with no leading space)
+    allow-unused: false # report any unused nolint directives
+    require-explanation: false # don't require an explanation for nolint directives
+    require-specific: false # don't require nolint directives to be specific about which linter is being skipped
+  revive:
+    confidence: 0
+
+issues:
+  exclude-rules:
+    # テストファイルでは一部のリンターを無効化
+    - path: _test\.go
+      linters:
+        - funlen
+        - dupl
+        - gocyclo
+        - errcheck
+        - lll
+        - gosec
+
+    # main関数では一部のリンターを無効化
+    - path: cmd/
+      linters:
+        - gochecknoinits
+
+    # モックファイルでは厳密なチェックを無効化
+    - path: mock
+      linters:
+        - dupl
+        - funlen
+
+  # 既知の問題を除外
+  exclude:
+    - "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv). is not checked"
+    - "exported method .* should have comment or be unexported"
+    - "exported type .* should have comment or be unexported"
+    - "exported const .* should have comment or be unexported"
+
+  # デフォルトの除外を使用しない
+  exclude-use-default: false
+
+  # 最大同一エラー表示数
+  max-same-issues: 0
+
+  # 新しいコードのみチェック
+  new: false
