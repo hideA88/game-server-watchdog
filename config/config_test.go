@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/hideA88/game-server-watchdog/pkg/logging"
@@ -31,19 +32,19 @@ func TestLoad(t *testing.T) {
 		{
 			name: "すべての環境変数が設定されている",
 			envVars: map[string]string{
-				"DISCORD_TOKEN":       "test-token",
+				"DISCORD_TOKEN":       "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				"DEBUG_MODE":          "true",
 				"LOG_LEVEL":           "debug",
-				"ALLOWED_CHANNEL_IDS": "123,456,789",
-				"ALLOWED_USER_IDS":    "111,222,333",
+				"ALLOWED_CHANNEL_IDS": "123456789012345678,123456789012345679",
+				"ALLOWED_USER_IDS":    "987654321098765432,987654321098765433",
 			},
 			want: &Config{
-				DiscordToken:             "test-token",
+				DiscordToken:             "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				DebugMode:                true,
 				LogLevel:                 logging.DebugLevel,
 				LogLevelStr:              "debug",
-				AllowedChannelIDs:        []string{"123", "456", "789"},
-				AllowedUserIDs:           []string{"111", "222", "333"},
+				AllowedChannelIDs:        []string{"123456789012345678", "123456789012345679"},
+				AllowedUserIDs:           []string{"987654321098765432", "987654321098765433"},
 				DockerComposePath:        "docker-compose.yml",
 				DockerComposeProjectName: "",
 			},
@@ -52,10 +53,10 @@ func TestLoad(t *testing.T) {
 		{
 			name: "必須項目のみ設定",
 			envVars: map[string]string{
-				"DISCORD_TOKEN": "test-token",
+				"DISCORD_TOKEN": "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 			},
 			want: &Config{
-				DiscordToken:             "test-token",
+				DiscordToken:             "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				DebugMode:                false,
 				LogLevel:                 logging.InfoLevel,
 				LogLevelStr:              "",
@@ -69,7 +70,7 @@ func TestLoad(t *testing.T) {
 		{
 			name: "DEBUG_MODEが無効な値",
 			envVars: map[string]string{
-				"DISCORD_TOKEN": "test-token",
+				"DISCORD_TOKEN": "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				"DEBUG_MODE":    "invalid",
 			},
 			want:    nil,
@@ -78,12 +79,12 @@ func TestLoad(t *testing.T) {
 		{
 			name: "空のチャンネルIDとユーザーID",
 			envVars: map[string]string{
-				"DISCORD_TOKEN":       "test-token",
+				"DISCORD_TOKEN":       "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				"ALLOWED_CHANNEL_IDS": "",
 				"ALLOWED_USER_IDS":    "",
 			},
 			want: &Config{
-				DiscordToken:             "test-token",
+				DiscordToken:             "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				DebugMode:                false,
 				LogLevel:                 logging.InfoLevel,
 				LogLevelStr:              "",
@@ -97,10 +98,10 @@ func TestLoad(t *testing.T) {
 		{
 			name: ".envファイルが存在しない場合でも環境変数から読み込む",
 			envVars: map[string]string{
-				"DISCORD_TOKEN": "test-token",
+				"DISCORD_TOKEN": "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 			},
 			want: &Config{
-				DiscordToken:             "test-token",
+				DiscordToken:             "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				DebugMode:                false,
 				LogLevel:                 logging.InfoLevel,
 				LogLevelStr:              "",
@@ -124,11 +125,11 @@ func TestLoad(t *testing.T) {
 		{
 			name: "有効なログレベル（info）",
 			envVars: map[string]string{
-				"DISCORD_TOKEN": "test-token",
+				"DISCORD_TOKEN": "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				"LOG_LEVEL":     "info",
 			},
 			want: &Config{
-				DiscordToken:             "test-token",
+				DiscordToken:             "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				DebugMode:                false,
 				LogLevel:                 logging.InfoLevel,
 				LogLevelStr:              "info",
@@ -142,11 +143,11 @@ func TestLoad(t *testing.T) {
 		{
 			name: "有効なログレベル（warn）",
 			envVars: map[string]string{
-				"DISCORD_TOKEN": "test-token",
+				"DISCORD_TOKEN": "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				"LOG_LEVEL":     "warn",
 			},
 			want: &Config{
-				DiscordToken:             "test-token",
+				DiscordToken:             "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				DebugMode:                false,
 				LogLevel:                 logging.WarnLevel,
 				LogLevelStr:              "warn",
@@ -160,11 +161,11 @@ func TestLoad(t *testing.T) {
 		{
 			name: "有効なログレベル（error）",
 			envVars: map[string]string{
-				"DISCORD_TOKEN": "test-token",
+				"DISCORD_TOKEN": "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				"LOG_LEVEL":     "error",
 			},
 			want: &Config{
-				DiscordToken:             "test-token",
+				DiscordToken:             "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				DebugMode:                false,
 				LogLevel:                 logging.ErrorLevel,
 				LogLevelStr:              "error",
@@ -178,11 +179,11 @@ func TestLoad(t *testing.T) {
 		{
 			name: "無効なログレベル",
 			envVars: map[string]string{
-				"DISCORD_TOKEN": "test-token",
+				"DISCORD_TOKEN": "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				"LOG_LEVEL":     "invalid",
 			},
 			want: &Config{
-				DiscordToken:             "test-token",
+				DiscordToken:             "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				DebugMode:                false,
 				LogLevel:                 logging.InfoLevel, // デフォルト値
 				LogLevelStr:              "invalid",
@@ -196,11 +197,11 @@ func TestLoad(t *testing.T) {
 		{
 			name: "大文字のログレベル（DEBUG）",
 			envVars: map[string]string{
-				"DISCORD_TOKEN": "test-token",
+				"DISCORD_TOKEN": "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				"LOG_LEVEL":     "DEBUG",
 			},
 			want: &Config{
-				DiscordToken:             "test-token",
+				DiscordToken:             "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				DebugMode:                false,
 				LogLevel:                 logging.DebugLevel,
 				LogLevelStr:              "DEBUG",
@@ -214,11 +215,11 @@ func TestLoad(t *testing.T) {
 		{
 			name: "混在大文字小文字のログレベル（Info）",
 			envVars: map[string]string{
-				"DISCORD_TOKEN": "test-token",
+				"DISCORD_TOKEN": "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				"LOG_LEVEL":     "Info",
 			},
 			want: &Config{
-				DiscordToken:             "test-token",
+				DiscordToken:             "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				DebugMode:                false,
 				LogLevel:                 logging.InfoLevel,
 				LogLevelStr:              "Info",
@@ -232,11 +233,11 @@ func TestLoad(t *testing.T) {
 		{
 			name: "大文字のログレベル（WARN）",
 			envVars: map[string]string{
-				"DISCORD_TOKEN": "test-token",
+				"DISCORD_TOKEN": "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				"LOG_LEVEL":     "WARN",
 			},
 			want: &Config{
-				DiscordToken:             "test-token",
+				DiscordToken:             "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				DebugMode:                false,
 				LogLevel:                 logging.WarnLevel,
 				LogLevelStr:              "WARN",
@@ -344,17 +345,17 @@ func TestLoad_WithEnvFile(t *testing.T) {
 	}{
 		{
 			name: ".envファイルから読み込み",
-			envFile: `DISCORD_TOKEN=env-file-token
+			envFile: `DISCORD_TOKEN=MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example
 DEBUG_MODE=true
-ALLOWED_CHANNEL_IDS=111,222
-ALLOWED_USER_IDS=333,444`,
+ALLOWED_CHANNEL_IDS=123456789012345678,123456789012345679
+ALLOWED_USER_IDS=987654321098765432,987654321098765433`,
 			want: &Config{
-				DiscordToken:             "env-file-token",
+				DiscordToken:             "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
 				DebugMode:                true,
 				LogLevel:                 logging.InfoLevel,
 				LogLevelStr:              "",
-				AllowedChannelIDs:        []string{"111", "222"},
-				AllowedUserIDs:           []string{"333", "444"},
+				AllowedChannelIDs:        []string{"123456789012345678", "123456789012345679"},
+				AllowedUserIDs:           []string{"987654321098765432", "987654321098765433"},
 				DockerComposePath:        "docker-compose.yml",
 				DockerComposeProjectName: "",
 			},
@@ -396,6 +397,52 @@ ALLOWED_USER_IDS=333,444`,
 
 			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Load() = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfig_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "有効な設定",
+			config: Config{
+				DiscordToken:      "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
+				AllowedChannelIDs: []string{"123456789012345678"},
+				AllowedUserIDs:    []string{"987654321098765432"},
+				DockerComposePath: "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "無効なDiscordトークン（短すぎる）",
+			config: Config{
+				DiscordToken: "short",
+			},
+			wantErr: true,
+			errMsg:  "token too short",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("Validate() error = nil, wantErr %v", tt.wantErr)
+					return
+				}
+				if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("Validate() error = %v, want error containing %v", err, tt.errMsg)
+				}
+			} else if err != nil {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
