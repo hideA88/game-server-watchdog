@@ -57,8 +57,8 @@ func (c *RestartCommand) Execute(args []string) (string, error) {
 	}
 
 	found := false
-	for _, container := range containers {
-		if container.Service == serviceName {
+	for i := range containers {
+		if containers[i].Service == serviceName {
 			found = true
 			break
 		}

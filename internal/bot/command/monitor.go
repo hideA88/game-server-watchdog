@@ -8,23 +8,36 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+
+	"golang.org/x/sync/errgroup"
+
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
 	"github.com/hideA88/game-server-watchdog/pkg/logging"
 	"github.com/hideA88/game-server-watchdog/pkg/system"
-	"golang.org/x/sync/errgroup"
 )
 
 const (
-	// アラート閾値
-	CPUAlertThreshold    = 85.0
+	// CPUAlertThreshold はCPU使用率のアラート閾値
+	CPUAlertThreshold = 85.0
+	// MemoryAlertThreshold はメモリ使用率のアラート闾値
 	MemoryAlertThreshold = 90.0
-	DiskAlertThreshold   = 90.0
+	// DiskAlertThreshold はディスク使用率のアラート闾値
+	DiskAlertThreshold = 90.0
 
-	// Discord制限
+	// DiscordMessageLimit はDiscordメッセージの最大文字数
 	DiscordMessageLimit = 2000
 
-	// タイムアウト
+	// ServiceOperationTimeout は操作のタイムアウト時間
 	ServiceOperationTimeout = 60 * time.Second
+
+	// containerStateStopped は停止中のコンテナの状態
+	containerStateStopped = "stopped"
+	// containerStateExited は終了したコンテナの状態
+	containerStateExited = "exited"
+	// gameServiceMinecraft はMinecraftサービス名
+	gameServiceMinecraft = "minecraft"
+	// statusIconUnknown は不明な状態のアイコン
+	statusIconUnknown = "❓"
 )
 
 // MonitorCommand handles the monitor command
@@ -39,7 +52,7 @@ type MonitorCommand struct {
 // NewMonitorCommand creates a new MonitorCommand
 func NewMonitorCommand(ctx context.Context, compose docker.ComposeService, monitor system.Monitor, composePath string) *MonitorCommand {
 	if composePath == "" {
-		composePath = "docker-compose.yml"
+		composePath = defaultComposePath
 	}
 	return &MonitorCommand{
 		compose:           compose,
@@ -61,7 +74,7 @@ func (c *MonitorCommand) Description() string {
 }
 
 // Execute runs the command
-func (c *MonitorCommand) Execute(args []string) (string, error) {
+func (c *MonitorCommand) Execute(_ []string) (string, error) {
 	// データ収集
 	data, err := c.collectMonitorData()
 	if err != nil {
@@ -191,8 +204,9 @@ func (c *MonitorCommand) buildMonitorReport(data *MonitorData) string {
 
 // GetGameIcon returns an icon based on the game service name
 func GetGameIcon(service string) string {
-	switch strings.ToLower(service) {
-	case "minecraft":
+	lowerService := strings.ToLower(service)
+	switch lowerService {
+	case gameServiceMinecraft:
 		return "⛏️"
 	case "rust":
 		return "🔧"
@@ -209,17 +223,18 @@ func GetGameIcon(service string) string {
 
 // GetStatusIcon returns an icon based on the container state
 func GetStatusIcon(state string) string {
-	switch strings.ToLower(state) {
-	case "running":
+	lowerState := strings.ToLower(state)
+	switch lowerState {
+	case containerStateRunning:
 		return "🟢"
-	case "stopped", "exited":
+	case containerStateStopped, containerStateExited:
 		return "🔴"
 	case "restarting":
 		return "🟡"
 	case "paused":
 		return "⏸️"
 	default:
-		return "❓"
+		return statusIconUnknown
 	}
 }
 
@@ -236,7 +251,7 @@ func FormatServiceName(service string) string {
 	// Split into words and capitalize each
 	words := strings.Fields(formatted)
 	for i, word := range words {
-		if len(word) > 0 {
+		if word != "" {
 			words[i] = strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
 		}
 	}
@@ -246,7 +261,8 @@ func FormatServiceName(service string) string {
 
 // GetHealthIcon returns an icon based on the health status
 func GetHealthIcon(health string) string {
-	switch strings.ToLower(health) {
+	lowerHealth := strings.ToLower(health)
+	switch lowerHealth {
 	case "healthy":
 		return "✅"
 	case "unhealthy":
@@ -254,7 +270,7 @@ func GetHealthIcon(health string) string {
 	case "starting":
 		return "🔄"
 	default:
-		return "❓"
+		return statusIconUnknown
 	}
 }
 
@@ -262,14 +278,14 @@ func GetHealthIcon(health string) string {
 func getServiceFromContainerName(containerName string) string {
 	// Docker Composeのコンテナ名は通常 "project_service_1" の形式
 	parts := strings.Split(containerName, "_")
-	if len(parts) >= 2 && len(parts[1]) > 0 {
+	if len(parts) >= 2 && parts[1] != "" {
 		return parts[1]
 	}
 	return containerName
 }
 
 // GetComponents returns Discord message components for the monitor command
-func (c *MonitorCommand) GetComponents(args []string) ([]discordgo.MessageComponent, error) {
+func (c *MonitorCommand) GetComponents(_ []string) ([]discordgo.MessageComponent, error) {
 	containers, err := c.compose.ListGameContainers(c.composePath)
 	if err != nil {
 		return nil, fmt.Errorf("コンテナ情報の取得に失敗しました: %w", err)
@@ -280,26 +296,26 @@ func (c *MonitorCommand) GetComponents(args []string) ([]discordgo.MessageCompon
 
 	// ボタン数のカウント（最大値を超えないように）
 	buttonCount := 0
-	for _, container := range containers {
+	for i := range containers {
 		// 最大ボタン数に達したら終了
 		if buttonCount >= docker.MaxTotalButtons {
 			break
 		}
 		// 停止中のコンテナに対しては起動ボタンを追加
-		if strings.ToLower(container.State) == "stopped" || strings.ToLower(container.State) == "exited" {
+		if strings.EqualFold(containers[i].State, containerStateStopped) || strings.EqualFold(containers[i].State, containerStateExited) {
 			button := discordgo.Button{
-				Label:    fmt.Sprintf("🚀 %s を起動", FormatServiceName(container.Service)),
+				Label:    fmt.Sprintf("🚀 %s を起動", FormatServiceName(containers[i].Service)),
 				Style:    discordgo.SuccessButton,
-				CustomID: fmt.Sprintf("start_service_%s", container.Service),
+				CustomID: fmt.Sprintf("start_service_%s", containers[i].Service),
 			}
 			buttons = append(buttons, button)
 			buttonCount++
-		} else if strings.ToLower(container.State) == "running" {
+		} else if strings.EqualFold(containers[i].State, containerStateRunning) {
 			// 稼働中のコンテナに対しては停止ボタンを追加
 			button := discordgo.Button{
-				Label:    fmt.Sprintf("🛑 %s を停止", FormatServiceName(container.Service)),
+				Label:    fmt.Sprintf("🛑 %s を停止", FormatServiceName(containers[i].Service)),
 				Style:    discordgo.DangerButton,
-				CustomID: fmt.Sprintf("stop_service_%s", container.Service),
+				CustomID: fmt.Sprintf("stop_service_%s", containers[i].Service),
 			}
 			buttons = append(buttons, button)
 			buttonCount++
@@ -393,7 +409,7 @@ func (c *MonitorCommand) handleServiceOperation(s *discordgo.Session, i *discord
 	// 親コンテキストがキャンセルされた場合は早期終了
 	select {
 	case <-c.ctx.Done():
-		logger.Warn(c.ctx, "Parent context cancelled, aborting operation",
+		logger.Warn(c.ctx, "Parent context canceled, aborting operation",
 			logging.String("service", serviceName))
 		return
 	default:

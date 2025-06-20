@@ -44,13 +44,13 @@ func TestMonitorCommand_ExecuteWithLongMessage(t *testing.T) {
 	}
 
 	mockCompose := &docker.MockComposeService{
-		ListContainersFunc: func(composePath string) ([]docker.ContainerInfo, error) {
+		ListContainersFunc: func(_ string) ([]docker.ContainerInfo, error) {
 			return containers, nil
 		},
-		ListGameContainersFunc: func(composePath string) ([]docker.ContainerInfo, error) {
+		ListGameContainersFunc: func(_ string) ([]docker.ContainerInfo, error) {
 			return containers[:10], nil // ゲームコンテナは10個
 		},
-		GetAllContainersStatsFunc: func(composePath string) ([]docker.ContainerStats, error) {
+		GetAllContainersStatsFunc: func(_ string) ([]docker.ContainerStats, error) {
 			return stats, nil
 		},
 	}
@@ -80,13 +80,13 @@ func TestMonitorCommand_ExecuteWithLongMessage(t *testing.T) {
 
 func TestMonitorCommand_collectMonitorDataWithErrors(t *testing.T) {
 	tests := []struct {
-		name                string
-		systemError         error
-		containerError      error
-		gameError           error
-		wantSystemError     bool
-		wantContainerError  bool
-		wantGameError       bool
+		name               string
+		systemError        error
+		containerError     error
+		gameError          error
+		wantSystemError    bool
+		wantContainerError bool
+		wantGameError      bool
 	}{
 		{
 			name:               "すべてのエラー",
@@ -117,10 +117,10 @@ func TestMonitorCommand_collectMonitorDataWithErrors(t *testing.T) {
 			}
 
 			mockCompose := &docker.MockComposeService{
-				ListContainersFunc: func(composePath string) ([]docker.ContainerInfo, error) {
+				ListContainersFunc: func(_ string) ([]docker.ContainerInfo, error) {
 					return nil, tt.containerError
 				},
-				ListGameContainersFunc: func(composePath string) ([]docker.ContainerInfo, error) {
+				ListGameContainersFunc: func(_ string) ([]docker.ContainerInfo, error) {
 					return nil, tt.gameError
 				},
 			}
@@ -197,7 +197,7 @@ func TestMonitorCommand_formatContainerRowEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := cmd.formatContainerRow(tt.container, tt.stats)
+			got := cmd.formatContainerRow(&tt.container, tt.stats)
 
 			for _, want := range tt.want {
 				if !strings.Contains(got, want) {

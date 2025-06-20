@@ -21,9 +21,11 @@ func (c *HelpCommand) Name() string {
 	return "help"
 }
 
+const helpDescription = "コマンド一覧を表示"
+
 // Description はコマンドの説明を返す
 func (c *HelpCommand) Description() string {
-	return "コマンド一覧を表示"
+	return helpDescription
 }
 
 // SetCommands は利用可能なコマンドのリストを設定
@@ -32,7 +34,7 @@ func (c *HelpCommand) SetCommands(commands []Command) {
 }
 
 // Execute はコマンドを実行する
-func (c *HelpCommand) Execute(args []string) (string, error) {
+func (c *HelpCommand) Execute(_ []string) (string, error) {
 	helpMessage := "**利用可能なコマンド:**\n"
 
 	for _, cmd := range c.commands {

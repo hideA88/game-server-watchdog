@@ -96,7 +96,7 @@ func TestMonitorCommand_buildSummaryMessage(t *testing.T) {
 					t.Errorf("buildSummaryMessage() does not contain %q\nGot: %s", want, got)
 				}
 			}
-			
+
 			// アラートがない場合は、アラート数が含まれていないことを確認
 			if tt.name == "アラートなし" {
 				if strings.Contains(got, "アラート数") {

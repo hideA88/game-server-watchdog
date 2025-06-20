@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/bwmarrin/discordgo"
+
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
 	"github.com/hideA88/game-server-watchdog/pkg/system"
 )
@@ -179,13 +180,13 @@ func TestMonitorCommand_Execute(t *testing.T) {
 				Err:        tt.systemError,
 			}
 			mockCompose := &docker.MockComposeService{
-				ListContainersFunc: func(composePath string) ([]docker.ContainerInfo, error) {
+				ListContainersFunc: func(_ string) ([]docker.ContainerInfo, error) {
 					return tt.containers, tt.containerErr
 				},
-				ListGameContainersFunc: func(composePath string) ([]docker.ContainerInfo, error) {
+				ListGameContainersFunc: func(_ string) ([]docker.ContainerInfo, error) {
 					return tt.gameContainers, tt.gameErr
 				},
-				GetAllContainersStatsFunc: func(composePath string) ([]docker.ContainerStats, error) {
+				GetAllContainersStatsFunc: func(_ string) ([]docker.ContainerStats, error) {
 					return tt.stats, nil
 				},
 				GetContainerStatsFunc: func(containerName string) (*docker.ContainerStats, error) {
@@ -268,7 +269,7 @@ func TestMonitorCommand_GetComponents(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockCompose := &docker.MockComposeService{
-				ListGameContainersFunc: func(composePath string) ([]docker.ContainerInfo, error) {
+				ListGameContainersFunc: func(_ string) ([]docker.ContainerInfo, error) {
 					return tt.containers, tt.err
 				},
 			}

@@ -8,6 +8,17 @@ import (
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
 )
 
+const (
+	// defaultLogCount はデフォルトのログ行数
+	defaultLogCount = 50
+	// maxLogCount は最大ログ行数
+	maxLogCount = 200
+	// maxLogLineLen は1行の最大文字数
+	maxLogLineLen = 200
+	// maxTotalLength はDiscordメッセージの最大文字数（ヘッダー・フッター用の余裕を持たせる）
+	maxTotalLength = 1800
+)
+
 // LogsCommand handles the logs command
 type LogsCommand struct {
 	compose     docker.ComposeService
@@ -17,7 +28,7 @@ type LogsCommand struct {
 // NewLogsCommand creates a new LogsCommand
 func NewLogsCommand(compose docker.ComposeService, composePath string) *LogsCommand {
 	if composePath == "" {
-		composePath = "docker-compose.yml"
+		composePath = defaultComposePath
 	}
 	return &LogsCommand{
 		compose:     compose,
@@ -42,7 +53,30 @@ func (c *LogsCommand) Execute(args []string) (string, error) {
 	}
 
 	serviceName := args[0]
-	lines := 50 // デフォルト行数
+	lines := c.parseLineCount(args)
+
+	// コンテナの存在確認
+	exists, err := c.containerExists(serviceName)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return fmt.Sprintf("❌ サービス '%s' が見つかりません", serviceName), nil
+	}
+
+	// ログを取得
+	logs, err := c.compose.GetContainerLogs(c.composePath, serviceName, lines)
+	if err != nil {
+		return fmt.Sprintf("❌ %s のログ取得に失敗しました: %v", FormatServiceName(serviceName), err), nil
+	}
+
+	// 結果を構築
+	return c.buildLogOutput(serviceName, lines, logs), nil
+}
+
+// parseLineCount は引数から行数を解析する
+func (c *LogsCommand) parseLineCount(args []string) int {
+	lines := defaultLogCount // デフォルト行数
 
 	// 行数が指定されている場合
 	if len(args) > 1 {
@@ -54,39 +88,30 @@ func (c *LogsCommand) Execute(args []string) (string, error) {
 	// 行数の制限
 	if lines < 1 {
 		lines = 1
-	} else if lines > 200 {
-		lines = 200
-		// 制限を超えた場合の警告
-		defer func() {
-			// この警告は結果の最後に追加される
-		}()
+	} else if lines > maxLogCount {
+		lines = maxLogCount
 	}
 
-	// コンテナの存在確認
+	return lines
+}
+
+// containerExists は指定されたサービスのコンテナが存在するか確認する
+func (c *LogsCommand) containerExists(serviceName string) (bool, error) {
 	containers, err := c.compose.ListContainers(c.composePath)
 	if err != nil {
-		return "", fmt.Errorf("コンテナ情報の取得に失敗しました: %w", err)
+		return false, fmt.Errorf("コンテナ情報の取得に失敗しました: %w", err)
 	}
 
-	found := false
-	for _, container := range containers {
-		if container.Service == serviceName {
-			found = true
-			break
+	for i := range containers {
+		if containers[i].Service == serviceName {
+			return true, nil
 		}
 	}
+	return false, nil
+}
 
-	if !found {
-		return fmt.Sprintf("❌ サービス '%s' が見つかりません", serviceName), nil
-	}
-
-	// ログを取得
-	logs, err := c.compose.GetContainerLogs(c.composePath, serviceName, lines)
-	if err != nil {
-		return fmt.Sprintf("❌ %s のログ取得に失敗しました: %v", FormatServiceName(serviceName), err), nil
-	}
-
-	// 結果を構築
+// buildLogOutput はログ出力を構築する
+func (c *LogsCommand) buildLogOutput(serviceName string, lines int, logs string) string {
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("📜 **%s のログ** (最後の%d行)\n", FormatServiceName(serviceName), lines))
 	builder.WriteString("```\n")
@@ -95,34 +120,7 @@ func (c *LogsCommand) Execute(args []string) (string, error) {
 	if strings.TrimSpace(logs) == "" {
 		builder.WriteString("(ログがありません)\n")
 	} else {
-		// ログを行に分割
-		logLines := strings.Split(strings.TrimSpace(logs), "\n")
-
-		// Discord のメッセージ制限を考慮（約2000文字）
-		totalLength := 0
-		maxLength := 1800 // ヘッダーとフッターのための余裕を持たせる
-		truncated := false
-
-		for i, line := range logLines {
-			// 各行を最大200文字に制限
-			if len(line) > 200 {
-				line = line[:197] + "..."
-			}
-
-			// 全体の長さをチェック
-			if totalLength+len(line)+1 > maxLength {
-				builder.WriteString(fmt.Sprintf("\n... (残り %d 行は省略されました)", len(logLines)-i))
-				truncated = true
-				break
-			}
-
-			builder.WriteString(line + "\n")
-			totalLength += len(line) + 1
-		}
-
-		if !truncated && lines > 200 {
-			builder.WriteString("\n(注意: 最大200行に制限されています)")
-		}
+		c.addFormattedLogs(&builder, logs, lines)
 	}
 
 	builder.WriteString("```\n")
@@ -131,5 +129,36 @@ func (c *LogsCommand) Execute(args []string) (string, error) {
 	builder.WriteString("\n💡 **ヒント**: より多くのログを見るには、行数を指定してください\n")
 	builder.WriteString(fmt.Sprintf("例: `@bot logs %s 100`", serviceName))
 
-	return builder.String(), nil
+	return builder.String()
+}
+
+// addFormattedLogs はフォーマットされたログを追加する
+func (c *LogsCommand) addFormattedLogs(builder *strings.Builder, logs string, requestedLines int) {
+	logLines := strings.Split(strings.TrimSpace(logs), "\n")
+
+	// Discord のメッセージ制限を考慮（約2000文字）
+	totalLength := 0
+	maxLength := maxTotalLength // ヘッダーとフッターのための余裕を持たせる
+	truncated := false
+
+	for i, line := range logLines {
+		// 各行を最大200文字に制限
+		if len(line) > maxLogLineLen {
+			line = line[:maxLogLineLen-3] + "..."
+		}
+
+		// 全体の長さをチェック
+		if totalLength+len(line)+1 > maxLength {
+			fmt.Fprintf(builder, "\n... (残り %d 行は省略されました)", len(logLines)-i)
+			truncated = true
+			break
+		}
+
+		builder.WriteString(line + "\n")
+		totalLength += len(line) + 1
+	}
+
+	if !truncated && requestedLines > maxLogCount {
+		builder.WriteString("\n(注意: 最大200行に制限されています)")
+	}
 }

@@ -46,8 +46,8 @@ func (c *MonitorCommand) buildContainerTable(containers []docker.ContainerInfo, 
 	if len(containers) == 0 {
 		builder.WriteString("│ 稼働中のコンテナはありません                      │\n")
 	} else {
-		for _, container := range containers {
-			row := c.formatContainerRow(container, statsMap)
+		for i := range containers {
+			row := c.formatContainerRow(&containers[i], statsMap)
 			builder.WriteString(row)
 		}
 	}
@@ -59,7 +59,7 @@ func (c *MonitorCommand) buildContainerTable(containers []docker.ContainerInfo, 
 }
 
 // formatContainerRow は1行分のコンテナ情報をフォーマットする
-func (c *MonitorCommand) formatContainerRow(container docker.ContainerInfo, statsMap map[string]*docker.ContainerStats) string {
+func (c *MonitorCommand) formatContainerRow(container *docker.ContainerInfo, statsMap map[string]*docker.ContainerStats) string {
 	// サービス名（最大17文字）
 	serviceName := container.Service
 	if len(serviceName) > 15 {
@@ -106,19 +106,19 @@ func (c *MonitorCommand) checkAlerts(sysInfo *system.SystemInfo, stats []docker.
 	var alerts []Alert
 
 	// コンテナのアラートチェック
-	for _, stat := range stats {
-		if stat.CPUPercent > CPUAlertThreshold {
+	for i := range stats {
+		if stats[i].CPUPercent > CPUAlertThreshold {
 			alerts = append(alerts, Alert{
-				Component: FormatServiceName(getServiceFromContainerName(stat.Name)),
+				Component: FormatServiceName(getServiceFromContainerName(stats[i].Name)),
 				Message:   "CPU使用率が高い",
-				Value:     stat.CPUPercent,
+				Value:     stats[i].CPUPercent,
 			})
 		}
-		if stat.MemoryPercent > MemoryAlertThreshold {
+		if stats[i].MemoryPercent > MemoryAlertThreshold {
 			alerts = append(alerts, Alert{
-				Component: FormatServiceName(getServiceFromContainerName(stat.Name)),
+				Component: FormatServiceName(getServiceFromContainerName(stats[i].Name)),
 				Message:   "メモリ使用率が高い",
-				Value:     stat.MemoryPercent,
+				Value:     stats[i].MemoryPercent,
 			})
 		}
 	}
@@ -176,15 +176,15 @@ func (c *MonitorCommand) buildGameServerInfo(gameContainers []docker.ContainerIn
 	if len(gameContainers) == 0 {
 		builder.WriteString("- 現在稼働中のゲームサーバーはありません\n")
 	} else {
-		for _, container := range gameContainers {
+		for i := range gameContainers {
 			// Status icon and name
-			statusIcon := GetStatusIcon(container.State)
-			gameIcon := GetGameIcon(container.Service)
+			statusIcon := GetStatusIcon(gameContainers[i].State)
+			gameIcon := GetGameIcon(gameContainers[i].Service)
 			builder.WriteString(fmt.Sprintf("• %s %s **%s**: %s",
-				statusIcon, gameIcon, FormatServiceName(container.Service), container.State))
+				statusIcon, gameIcon, FormatServiceName(gameContainers[i].Service), gameContainers[i].State))
 
-			if container.State == "running" && container.RunningFor != "" {
-				builder.WriteString(fmt.Sprintf(" (%s)", container.RunningFor))
+			if strings.EqualFold(gameContainers[i].State, containerStateRunning) && gameContainers[i].RunningFor != "" {
+				builder.WriteString(fmt.Sprintf(" (%s)", gameContainers[i].RunningFor))
 			}
 			builder.WriteString("\n")
 		}
@@ -207,8 +207,8 @@ func (c *MonitorCommand) buildSummaryMessage(data *MonitorData) string {
 	builder.WriteString("📦 **コンテナ数**: ")
 	if data.Containers != nil {
 		runningCount := 0
-		for _, c := range data.Containers {
-			if strings.ToLower(c.State) == "running" {
+		for i := range data.Containers {
+			if strings.EqualFold(data.Containers[i].State, containerStateRunning) {
 				runningCount++
 			}
 		}

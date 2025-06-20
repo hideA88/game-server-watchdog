@@ -29,7 +29,7 @@ func (c *StatusCommand) Description() string {
 }
 
 // Execute はコマンドを実行する
-func (c *StatusCommand) Execute(args []string) (string, error) {
+func (c *StatusCommand) Execute(_ []string) (string, error) {
 	info, err := c.monitor.GetSystemInfo()
 	if err != nil {
 		return "", fmt.Errorf("システム情報の取得に失敗しました: %w", err)

@@ -1,3 +1,4 @@
+// Package command はDiscordボット用のコマンドハンドラーを提供します
 package command
 
 import (
@@ -5,6 +6,23 @@ import (
 	"strings"
 
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
+)
+
+const (
+	// defaultComposePath はデフォルトのdocker-compose.ymlのパス
+	defaultComposePath = "docker-compose.yml"
+	// containerStateRunning は実行中のコンテナの状態
+	containerStateRunning = "running"
+	// containerMemoryZero はメモリ使用量が0の場合の表示
+	containerMemoryZero = "0B / 0B"
+	// defaultLogLines はデフォルトのログ行数
+	defaultLogLines = 10
+	// cpuHighThreshold はCPU使用率の高負荷閾値
+	cpuHighThreshold = 85.0
+	// memoryHighThreshold はメモリ使用率の高負荷閾値
+	memoryHighThreshold = 90.0
+	// maxLogLineLength は1行の最大文字数
+	maxLogLineLength = 80
 )
 
 // ContainerCommand handles the container command
@@ -16,7 +34,7 @@ type ContainerCommand struct {
 // NewContainerCommand creates a new ContainerCommand
 func NewContainerCommand(compose docker.ComposeService, composePath string) *ContainerCommand {
 	if composePath == "" {
-		composePath = "docker-compose.yml"
+		composePath = defaultComposePath
 	}
 	return &ContainerCommand{
 		compose:     compose,
@@ -41,21 +59,10 @@ func (c *ContainerCommand) Execute(args []string) (string, error) {
 	}
 
 	serviceName := args[0]
-
-	// コンテナ一覧を取得して対象のコンテナを探す
-	containers, err := c.compose.ListContainers(c.composePath)
+	targetContainer, err := c.findContainer(serviceName)
 	if err != nil {
-		return "", fmt.Errorf("コンテナ情報の取得に失敗しました: %w", err)
+		return "", err
 	}
-
-	var targetContainer *docker.ContainerInfo
-	for i := range containers {
-		if containers[i].Service == serviceName {
-			targetContainer = &containers[i]
-			break
-		}
-	}
-
 	if targetContainer == nil {
 		return fmt.Sprintf("❌ サービス '%s' が見つかりません", serviceName), nil
 	}
@@ -63,89 +70,127 @@ func (c *ContainerCommand) Execute(args []string) (string, error) {
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("📦 **%s の詳細情報**\n\n", FormatServiceName(serviceName)))
 
-	// 基本情報
+	// 基本情報を追加
+	c.addBasicInfo(&builder, targetContainer)
+
+	// 実行中の場合はリソース使用状況を表示
+	if strings.EqualFold(targetContainer.State, containerStateRunning) {
+		c.addResourceInfo(&builder, targetContainer)
+	}
+
+	// 最近のログを追加
+	c.addRecentLogs(&builder, serviceName)
+
+	// 使用可能なコマンドを追加
+	c.addAvailableCommands(&builder, serviceName, targetContainer.State)
+
+	return builder.String(), nil
+}
+
+// findContainer は指定されたサービス名のコンテナを検索する
+func (c *ContainerCommand) findContainer(serviceName string) (*docker.ContainerInfo, error) {
+	containers, err := c.compose.ListContainers(c.composePath)
+	if err != nil {
+		return nil, fmt.Errorf("コンテナ情報の取得に失敗しました: %w", err)
+	}
+
+	for i := range containers {
+		if containers[i].Service == serviceName {
+			return &containers[i], nil
+		}
+	}
+	return nil, nil
+}
+
+// addBasicInfo は基本情報を追加する
+func (c *ContainerCommand) addBasicInfo(builder *strings.Builder, container *docker.ContainerInfo) {
 	builder.WriteString("**基本情報**\n")
-	builder.WriteString(fmt.Sprintf("- コンテナ名: %s\n", targetContainer.Name))
-	builder.WriteString(fmt.Sprintf("- コンテナID: %s\n", targetContainer.ID[:12]))
+	fmt.Fprintf(builder, "- コンテナ名: %s\n", container.Name)
+	fmt.Fprintf(builder, "- コンテナID: %s\n", container.ID[:12])
 
 	// 状態
-	statusIcon := GetStatusIcon(targetContainer.State)
-	builder.WriteString(fmt.Sprintf("- 状態: %s %s\n", statusIcon, targetContainer.State))
-	if targetContainer.RunningFor != "" {
-		builder.WriteString(fmt.Sprintf("- 稼働時間: %s\n", targetContainer.RunningFor))
+	statusIcon := GetStatusIcon(container.State)
+	fmt.Fprintf(builder, "- 状態: %s %s\n", statusIcon, container.State)
+	if container.RunningFor != "" {
+		fmt.Fprintf(builder, "- 稼働時間: %s\n", container.RunningFor)
 	}
 
 	// ヘルスチェック
-	if targetContainer.HealthStatus != "" && targetContainer.HealthStatus != "none" {
-		healthIcon := GetHealthIcon(targetContainer.HealthStatus)
-		builder.WriteString(fmt.Sprintf("- ヘルス: %s %s\n", healthIcon, targetContainer.HealthStatus))
+	if container.HealthStatus != "" && container.HealthStatus != "none" {
+		healthIcon := GetHealthIcon(container.HealthStatus)
+		fmt.Fprintf(builder, "- ヘルス: %s %s\n", healthIcon, container.HealthStatus)
 	}
 
 	// ポート
-	if len(targetContainer.Ports) > 0 {
-		builder.WriteString(fmt.Sprintf("- ポート: %s\n", strings.Join(targetContainer.Ports, ", ")))
+	if len(container.Ports) > 0 {
+		fmt.Fprintf(builder, "- ポート: %s\n", strings.Join(container.Ports, ", "))
+	}
+}
+
+// addResourceInfo はリソース使用状況を追加する
+func (c *ContainerCommand) addResourceInfo(builder *strings.Builder, container *docker.ContainerInfo) {
+	stats, err := c.compose.GetContainerStats(container.Name)
+	if err != nil {
+		return
 	}
 
-	// 実行中の場合はリソース使用状況を表示
-	if strings.ToLower(targetContainer.State) == "running" {
-		stats, err := c.compose.GetContainerStats(targetContainer.Name)
-		if err == nil {
-			builder.WriteString("\n**リソース使用状況**\n")
-			builder.WriteString(fmt.Sprintf("- CPU使用率: %.1f%%\n", stats.CPUPercent))
-			builder.WriteString(fmt.Sprintf("- メモリ使用率: %.1f%%\n", stats.MemoryPercent))
-			builder.WriteString(fmt.Sprintf("- メモリ使用量: %s\n", stats.MemoryUsage))
-			if stats.NetworkIO != "" && stats.NetworkIO != "0B / 0B" {
-				builder.WriteString(fmt.Sprintf("- ネットワークI/O: %s\n", stats.NetworkIO))
-			}
-			if stats.BlockIO != "" && stats.BlockIO != "0B / 0B" {
-				builder.WriteString(fmt.Sprintf("- ブロックI/O: %s\n", stats.BlockIO))
-			}
+	builder.WriteString("\n**リソース使用状況**\n")
+	fmt.Fprintf(builder, "- CPU使用率: %.1f%%\n", stats.CPUPercent)
+	fmt.Fprintf(builder, "- メモリ使用率: %.1f%%\n", stats.MemoryPercent)
+	fmt.Fprintf(builder, "- メモリ使用量: %s\n", stats.MemoryUsage)
 
-			// 高負荷警告
-			if stats.CPUPercent > 85.0 || stats.MemoryPercent > 90.0 {
-				builder.WriteString("\n⚠️ **警告**\n")
-				if stats.CPUPercent > 85.0 {
-					builder.WriteString(fmt.Sprintf("- CPU使用率が高い状態です (%.1f%%)\n", stats.CPUPercent))
-				}
-				if stats.MemoryPercent > 90.0 {
-					builder.WriteString(fmt.Sprintf("- メモリ使用率が高い状態です (%.1f%%)\n", stats.MemoryPercent))
-				}
-			}
+	if stats.NetworkIO != "" && stats.NetworkIO != containerMemoryZero {
+		fmt.Fprintf(builder, "- ネットワークI/O: %s\n", stats.NetworkIO)
+	}
+	if stats.BlockIO != "" && stats.BlockIO != containerMemoryZero {
+		fmt.Fprintf(builder, "- ブロックI/O: %s\n", stats.BlockIO)
+	}
+
+	// 高負荷警告
+	if stats.CPUPercent > cpuHighThreshold || stats.MemoryPercent > memoryHighThreshold {
+		builder.WriteString("\n⚠️ **警告**\n")
+		if stats.CPUPercent > cpuHighThreshold {
+			fmt.Fprintf(builder, "- CPU使用率が高い状態です (%.1f%%)\n", stats.CPUPercent)
+		}
+		if stats.MemoryPercent > memoryHighThreshold {
+			fmt.Fprintf(builder, "- メモリ使用率が高い状態です (%.1f%%)\n", stats.MemoryPercent)
 		}
 	}
+}
 
-	// 最近のログ（最後の10行）
+// addRecentLogs は最近のログを追加する
+func (c *ContainerCommand) addRecentLogs(builder *strings.Builder, serviceName string) {
 	builder.WriteString("\n**最近のログ** (最後の10行)\n")
 	builder.WriteString("```\n")
 
-	logs, err := c.compose.GetContainerLogs(c.composePath, serviceName, 10)
+	logs, err := c.compose.GetContainerLogs(c.composePath, serviceName, defaultLogLines)
 	if err != nil {
 		builder.WriteString("ログの取得に失敗しました\n")
 	} else {
 		// ログが長すぎる場合は切り詰める
 		logLines := strings.Split(strings.TrimSpace(logs), "\n")
 		for i, line := range logLines {
-			if i >= 10 {
+			if i >= defaultLogLines {
 				break
 			}
 			// 各行を最大80文字に制限
-			if len(line) > 80 {
-				line = line[:77] + "..."
+			if len(line) > maxLogLineLength {
+				line = line[:maxLogLineLength-3] + "..."
 			}
 			builder.WriteString(line + "\n")
 		}
 	}
 
 	builder.WriteString("```\n")
+}
 
-	// 使用可能なコマンド
+// addAvailableCommands は使用可能なコマンドを追加する
+func (c *ContainerCommand) addAvailableCommands(builder *strings.Builder, serviceName, state string) {
 	builder.WriteString("\n**使用可能なコマンド**\n")
-	if strings.ToLower(targetContainer.State) == "running" {
+	if strings.EqualFold(state, containerStateRunning) {
 		builder.WriteString("- `@bot restart " + serviceName + "` - コンテナを再起動\n")
 		builder.WriteString("- `@bot logs " + serviceName + " [行数]` - より多くのログを表示\n")
 	} else {
 		builder.WriteString("- `@bot monitor` から起動ボタンを使用してコンテナを起動\n")
 	}
-
-	return builder.String(), nil
 }
