@@ -30,6 +30,7 @@ func New(config *config.Config, monitor system.Monitor, compose docker.ComposeSe
 	// ルーターを初期化して登録
 	router := handler.NewRouter(config, monitor, compose)
 	session.AddHandler(router.Handle)
+	session.AddHandler(router.HandleInteraction)
 
 	return bot, nil
 }

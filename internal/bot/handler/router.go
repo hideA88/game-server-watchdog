@@ -17,23 +17,31 @@ type CommandHandler struct {
 	SendMsgFunc sendMessageFunc
 }
 
-type sendMessageFunc func(s *discordgo.Session, m *discordgo.MessageCreate, content string) (*discordgo.Message, error)
+type sendMessageFunc func(s *discordgo.Session, m *discordgo.MessageCreate, content string, components []discordgo.MessageComponent) (*discordgo.Message, error)
 
-func sendSimpleMessage(s *discordgo.Session, m *discordgo.MessageCreate, content string) (*discordgo.Message, error) {
+func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, content string, components []discordgo.MessageComponent) (*discordgo.Message, error) {
+	if len(components) > 0 {
+		return s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
+			Content:    content,
+			Components: components,
+		})
+	}
 	return s.ChannelMessageSend(m.ChannelID, content)
 }
 
 // Router はメッセージをルーティングして適切なコマンドに振り分ける
 type Router struct {
-	config   *config.Config
-	commands map[string]*CommandHandler
+	config               *config.Config
+	commands             map[string]*CommandHandler
+	interactionHandlers  []command.InteractionHandler
 }
 
 // NewRouter は新しいルーターを作成し、コマンドを登録
 func NewRouter(cfg *config.Config, monitor system.Monitor, compose docker.ComposeService) *Router {
 	r := &Router{
-		config:   cfg,
-		commands: make(map[string]*CommandHandler),
+		config:              cfg,
+		commands:            make(map[string]*CommandHandler),
+		interactionHandlers: []command.InteractionHandler{},
 	}
 
 	// コマンドを初期化して登録
@@ -42,10 +50,13 @@ func NewRouter(cfg *config.Config, monitor system.Monitor, compose docker.Compos
 	statusCmd := command.NewStatusCommand(monitor)
 	gameInfoCmd := command.NewGameInfoCommand(compose, cfg.DockerComposePath)
 
-	r.RegisterCommand(pingCmd, sendSimpleMessage)
-	r.RegisterCommand(helpCmd, sendSimpleMessage)
-	r.RegisterCommand(statusCmd, sendSimpleMessage)
-	r.RegisterCommand(gameInfoCmd, sendSimpleMessage)
+	r.RegisterCommand(pingCmd, sendMessage)
+	r.RegisterCommand(helpCmd, sendMessage)
+	r.RegisterCommand(statusCmd, sendMessage)
+	r.RegisterCommand(gameInfoCmd, sendMessage)
+
+	// インタラクションハンドラーを登録
+	r.RegisterInteractionHandler(gameInfoCmd)
 
 	// helpコマンドに利用可能なコマンドを設定
 	commands := []command.Command{pingCmd, helpCmd, statusCmd, gameInfoCmd}
@@ -60,6 +71,11 @@ func (r *Router) RegisterCommand(cmd command.Command, sendMsgFunc sendMessageFun
 		Cmd:         cmd,
 		SendMsgFunc: sendMsgFunc,
 	}
+}
+
+// RegisterInteractionHandler はインタラクションハンドラーを登録
+func (r *Router) RegisterInteractionHandler(handler command.InteractionHandler) {
+	r.interactionHandlers = append(r.interactionHandlers, handler)
 }
 
 // ParseCommand はメッセージからメンションを削除してコマンドと引数を抽出
@@ -144,9 +160,68 @@ func (r *Router) Handle(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	// 結果を送信
 	if handler, exists := r.commands[command]; exists {
-		if _, err := handler.SendMsgFunc(s, m, result); err != nil {
+		// インタラクティブコマンドの場合はコンポーネントも送信
+		var components []discordgo.MessageComponent
+		if interactiveCmd, ok := handler.Cmd.(interface {
+			GetComponents(args []string) ([]discordgo.MessageComponent, error)
+		}); ok {
+			if comps, err := interactiveCmd.GetComponents(args); err == nil {
+				components = comps
+			}
+		}
+		
+		if _, err := handler.SendMsgFunc(s, m, result, components); err != nil {
 			log.Printf("メッセージの送信に失敗しました: %v", err)
 			_, _ = s.ChannelMessageSend(m.ChannelID, "メッセージの送信中にエラーが発生しました。")
 		}
 	}
 }
+
+// HandleInteraction はDiscordのインタラクションイベントを処理
+func (r *Router) HandleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	// メッセージコンポーネントのインタラクションのみ処理
+	if i.Type != discordgo.InteractionMessageComponent {
+		return
+	}
+
+	// アクセス権限チェック
+	if !IsAuthorized(r.config, i.ChannelID, i.Member.User.ID) {
+		log.Printf("Unauthorized interaction from user %s in channel %s", i.Member.User.ID, i.ChannelID)
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "このアクションを実行する権限がありません。",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		if err != nil {
+			log.Printf("Failed to respond to unauthorized interaction: %v", err)
+		}
+		return
+	}
+
+	data := i.MessageComponentData()
+
+	// 登録されたハンドラーから適切なものを探す
+	for _, handler := range r.interactionHandlers {
+		if handler.CanHandle(data.CustomID) {
+			if err := handler.HandleInteraction(s, i); err != nil {
+				log.Printf("Failed to handle interaction: %v", err)
+				// エラー応答を試みる
+				_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "処理中にエラーが発生しました。",
+						Flags:   discordgo.MessageFlagsEphemeral,
+					},
+				})
+			}
+			return
+		}
+	}
+	
+	// 未知のインタラクション
+	log.Printf("Unknown interaction custom ID: %s", data.CustomID)
+}
+
+

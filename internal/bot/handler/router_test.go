@@ -87,7 +87,7 @@ func TestRouter_RegisterCommand(t *testing.T) {
 			}
 
 			// コマンドを登録
-			router.RegisterCommand(tt.command, sendSimpleMessage)
+			router.RegisterCommand(tt.command, sendMessage)
 
 			// コマンドが正しく登録されているか確認
 			if registeredCmd, exists := router.commands[tt.wantCmdName]; !exists {
