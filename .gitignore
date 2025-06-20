@@ -37,9 +37,16 @@ dist/
 build/
 bin/
 
+# GoReleaser
+.goreleaser/
+
 # Log files
 *.log
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp
+
+# Development environment data
+infra/dev/games/
+infra/dev/shared/logs/ 
