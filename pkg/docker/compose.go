@@ -1,3 +1,4 @@
+// Package docker はDockerコンテナおよびDocker Composeの操作を提供します
 package docker
 
 import (
@@ -62,19 +63,19 @@ func (s *DefaultComposeService) listContainersWithFilter(filterArgs filters.Args
 	}
 
 	var result []ContainerInfo
-	for _, c := range containers {
+	for i := range containers {
 		// コンテナの詳細情報を取得
-		inspect, err := s.client.ContainerInspect(ctx, c.ID)
+		inspect, err := s.client.ContainerInspect(ctx, containers[i].ID)
 		if err != nil {
 			continue
 		}
 
 		// サービス名を取得
-		serviceName := c.Labels[LabelDockerComposeService]
+		serviceName := containers[i].Labels[LabelDockerComposeService]
 
 		// ポート情報を整形
 		var ports []string
-		for _, p := range c.Ports {
+		for _, p := range containers[i].Ports {
 			if p.PublicPort > 0 {
 				ports = append(ports, fmt.Sprintf("%d:%d/%s", p.PublicPort, p.PrivatePort, p.Type))
 			}
@@ -91,7 +92,7 @@ func (s *DefaultComposeService) listContainersWithFilter(filterArgs filters.Args
 
 		// 稼働時間を計算
 		var runningFor string
-		if state == "running" && inspect.State.StartedAt != "" {
+		if state == containerStateRunning && inspect.State.StartedAt != "" {
 			startedAt, err := time.Parse(time.RFC3339Nano, inspect.State.StartedAt)
 			if err == nil {
 				duration := time.Since(startedAt)
@@ -100,16 +101,16 @@ func (s *DefaultComposeService) listContainersWithFilter(filterArgs filters.Args
 		}
 
 		info := ContainerInfo{
-			ID:           c.ID[:12],
-			Name:         strings.TrimPrefix(c.Names[0], "/"),
+			ID:           containers[i].ID[:12],
+			Name:         strings.TrimPrefix(containers[i].Names[0], "/"),
 			Service:      serviceName,
-			Image:        c.Image,
-			Status:       c.Status,
+			Image:        containers[i].Image,
+			Status:       containers[i].Status,
 			State:        state,
 			RunningFor:   runningFor,
 			Ports:        ports,
 			HealthStatus: healthStatus,
-			CreatedAt:    time.Unix(c.Created, 0),
+			CreatedAt:    time.Unix(containers[i].Created, 0),
 		}
 
 		result = append(result, info)
@@ -154,65 +155,17 @@ func (s *DefaultComposeService) ListGameContainers(composePath string) ([]Contai
 }
 
 // StartService starts a specific service
-func (s *DefaultComposeService) StartService(composePath string, serviceName string) error {
-	if !IsValidServiceName(serviceName) {
-		return fmt.Errorf("%w: %s", ErrInvalidServiceName, serviceName)
-	}
-
-	projectName := s.getProjectName(composePath)
-
-	// サービスに属するコンテナを検索
-	containers, err := s.findServiceContainers(projectName, serviceName)
-	if err != nil {
-		return err
-	}
-
-	if len(containers) == 0 {
-		return fmt.Errorf("service %s not found", serviceName)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), ServiceOperationTimeout)
-	defer cancel()
-
-	// すべてのコンテナを起動
-	for _, c := range containers {
-		if err := s.client.ContainerStart(ctx, c.ID, container.StartOptions{}); err != nil {
-			return fmt.Errorf("failed to start container %s: %w", c.Names[0], err)
-		}
-	}
-
-	return nil
+func (s *DefaultComposeService) StartService(composePath, serviceName string) error {
+	return s.executeServiceOperation(composePath, serviceName, "start", func(ctx context.Context, c container.Summary) error {
+		return s.client.ContainerStart(ctx, c.ID, container.StartOptions{})
+	})
 }
 
 // StopService stops a specific service
-func (s *DefaultComposeService) StopService(composePath string, serviceName string) error {
-	if !IsValidServiceName(serviceName) {
-		return fmt.Errorf("%w: %s", ErrInvalidServiceName, serviceName)
-	}
-
-	projectName := s.getProjectName(composePath)
-
-	// サービスに属するコンテナを検索
-	containers, err := s.findServiceContainers(projectName, serviceName)
-	if err != nil {
-		return err
-	}
-
-	if len(containers) == 0 {
-		return fmt.Errorf("service %s not found", serviceName)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), ServiceOperationTimeout)
-	defer cancel()
-
-	// すべてのコンテナを停止
-	for _, c := range containers {
-		if err := s.client.ContainerStop(ctx, c.ID, container.StopOptions{}); err != nil {
-			return fmt.Errorf("failed to stop container %s: %w", c.Names[0], err)
-		}
-	}
-
-	return nil
+func (s *DefaultComposeService) StopService(composePath, serviceName string) error {
+	return s.executeServiceOperation(composePath, serviceName, "stop", func(ctx context.Context, c container.Summary) error {
+		return s.client.ContainerStop(ctx, c.ID, container.StopOptions{})
+	})
 }
 
 // GetContainerStats gets resource usage stats for a specific container
@@ -301,9 +254,9 @@ func (s *DefaultComposeService) GetAllContainersStats(composePath string) ([]Con
 	}
 
 	var stats []ContainerStats
-	for _, container := range containers {
-		if strings.ToLower(container.State) == "running" {
-			stat, err := s.GetContainerStats(container.Name)
+	for i := range containers {
+		if strings.EqualFold(containers[i].State, containerStateRunning) {
+			stat, err := s.GetContainerStats(containers[i].Name)
 			if err != nil {
 				continue
 			}
@@ -314,8 +267,9 @@ func (s *DefaultComposeService) GetAllContainersStats(composePath string) ([]Con
 	return stats, nil
 }
 
-// RestartContainer restarts a specific container
-func (s *DefaultComposeService) RestartContainer(composePath string, serviceName string) error {
+// executeServiceOperation executes a common service operation pattern
+func (s *DefaultComposeService) executeServiceOperation(composePath, serviceName, operation string,
+	containerOp func(context.Context, container.Summary) error) error {
 	if !IsValidServiceName(serviceName) {
 		return fmt.Errorf("%w: %s", ErrInvalidServiceName, serviceName)
 	}
@@ -335,18 +289,25 @@ func (s *DefaultComposeService) RestartContainer(composePath string, serviceName
 	ctx, cancel := context.WithTimeout(context.Background(), ServiceOperationTimeout)
 	defer cancel()
 
-	// すべてのコンテナを再起動
-	for _, c := range containers {
-		if err := s.client.ContainerRestart(ctx, c.ID, container.StopOptions{}); err != nil {
-			return fmt.Errorf("failed to restart container %s: %w", c.Names[0], err)
+	// すべてのコンテナに操作を実行
+	for i := range containers {
+		if err := containerOp(ctx, containers[i]); err != nil {
+			return fmt.Errorf("failed to %s container %s: %w", operation, containers[i].Names[0], err)
 		}
 	}
 
 	return nil
 }
 
+// RestartContainer restarts a specific container
+func (s *DefaultComposeService) RestartContainer(composePath, serviceName string) error {
+	return s.executeServiceOperation(composePath, serviceName, "restart", func(ctx context.Context, c container.Summary) error {
+		return s.client.ContainerRestart(ctx, c.ID, container.StopOptions{})
+	})
+}
+
 // GetContainerLogs gets logs from a specific container
-func (s *DefaultComposeService) GetContainerLogs(composePath string, serviceName string, lines int) (string, error) {
+func (s *DefaultComposeService) GetContainerLogs(composePath, serviceName string, lines int) (string, error) {
 	if !IsValidServiceName(serviceName) {
 		return "", fmt.Errorf("%w: %s", ErrInvalidServiceName, serviceName)
 	}

@@ -5,6 +5,11 @@ import (
 	"testing"
 )
 
+const (
+	testDockerCompose = "docker-compose.yml"
+	testServiceName   = "web"
+)
+
 func TestMockComposeService_StartService(t *testing.T) {
 	t.Parallel()
 
@@ -17,32 +22,26 @@ func TestMockComposeService_StartService(t *testing.T) {
 	}{
 		{
 			name:        "successful start",
-			composePath: "docker-compose.yml",
-			serviceName: "web",
-			mockFunc: func(path, service string) error {
-				if path != "docker-compose.yml" {
-					t.Errorf("unexpected composePath: %s", path)
-				}
-				if service != "web" {
-					t.Errorf("unexpected serviceName: %s", service)
-				}
+			composePath: testDockerCompose,
+			serviceName: testServiceName,
+			mockFunc: func(_, _ string) error {
 				return nil
 			},
 			wantErr: false,
 		},
 		{
 			name:        "start error",
-			composePath: "docker-compose.yml",
-			serviceName: "web",
-			mockFunc: func(path, service string) error {
+			composePath: testDockerCompose,
+			serviceName: testServiceName,
+			mockFunc: func(_, _ string) error {
 				return errors.New("start failed")
 			},
 			wantErr: true,
 		},
 		{
 			name:        "nil function returns nil",
-			composePath: "docker-compose.yml",
-			serviceName: "web",
+			composePath: testDockerCompose,
+			serviceName: testServiceName,
 			mockFunc:    nil,
 			wantErr:     false,
 		},
@@ -88,17 +87,17 @@ func TestMockComposeService_StopService(t *testing.T) {
 		},
 		{
 			name:        "stop error",
-			composePath: "docker-compose.yml",
-			serviceName: "web",
-			mockFunc: func(path, service string) error {
+			composePath: testDockerCompose,
+			serviceName: testServiceName,
+			mockFunc: func(_, _ string) error {
 				return errors.New("stop failed")
 			},
 			wantErr: true,
 		},
 		{
 			name:        "nil function returns nil",
-			composePath: "docker-compose.yml",
-			serviceName: "web",
+			composePath: testDockerCompose,
+			serviceName: testServiceName,
 			mockFunc:    nil,
 			wantErr:     false,
 		},

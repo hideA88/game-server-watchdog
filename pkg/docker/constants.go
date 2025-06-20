@@ -10,7 +10,6 @@ const (
 	// MaxTotalButtons は総ボタン数の最大値
 	MaxTotalButtons = MaxButtonRows * MaxButtonsPerRow
 
-	// Timeouts
 	// ServiceOperationTimeout はDocker操作のタイムアウト時間
 	ServiceOperationTimeout = 30 * time.Second
 	// ListOperationTimeout はリスト操作のタイムアウト時間
@@ -18,11 +17,14 @@ const (
 	// QueryOperationTimeout はクエリ操作のタイムアウト時間
 	QueryOperationTimeout = 5 * time.Second
 
-	// Docker labels
 	// LabelDockerComposeProject はDocker Composeプロジェクト名のラベル
 	LabelDockerComposeProject = "com.docker.compose.project"
 	// LabelDockerComposeService はDocker Composeサービス名のラベル
 	LabelDockerComposeService = "com.docker.compose.service"
 	// LabelGameType はゲームコンテナを識別するためのラベル
 	LabelGameType = "game.type"
+
+	// Container states
+	// containerStateRunning は実行中のコンテナの状態
+	containerStateRunning = "running"
 )

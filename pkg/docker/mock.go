@@ -4,12 +4,12 @@ package docker
 type MockComposeService struct {
 	ListContainersFunc        func(composePath string) ([]ContainerInfo, error)
 	ListGameContainersFunc    func(composePath string) ([]ContainerInfo, error)
-	StartServiceFunc          func(composePath string, serviceName string) error
-	StopServiceFunc           func(composePath string, serviceName string) error
+	StartServiceFunc          func(composePath, serviceName string) error
+	StopServiceFunc           func(composePath, serviceName string) error
 	GetContainerStatsFunc     func(containerName string) (*ContainerStats, error)
 	GetAllContainersStatsFunc func(composePath string) ([]ContainerStats, error)
-	RestartContainerFunc      func(composePath string, serviceName string) error
-	GetContainerLogsFunc      func(composePath string, serviceName string, lines int) (string, error)
+	RestartContainerFunc      func(composePath, serviceName string) error
+	GetContainerLogsFunc      func(composePath, serviceName string, lines int) (string, error)
 }
 
 // ListContainers calls the mock function
@@ -30,7 +30,7 @@ func (m *MockComposeService) ListGameContainers(composePath string) ([]Container
 }
 
 // StartService calls the mock function
-func (m *MockComposeService) StartService(composePath string, serviceName string) error {
+func (m *MockComposeService) StartService(composePath, serviceName string) error {
 	if m.StartServiceFunc != nil {
 		return m.StartServiceFunc(composePath, serviceName)
 	}
@@ -38,7 +38,7 @@ func (m *MockComposeService) StartService(composePath string, serviceName string
 }
 
 // StopService calls the mock function
-func (m *MockComposeService) StopService(composePath string, serviceName string) error {
+func (m *MockComposeService) StopService(composePath, serviceName string) error {
 	if m.StopServiceFunc != nil {
 		return m.StopServiceFunc(composePath, serviceName)
 	}
@@ -62,7 +62,7 @@ func (m *MockComposeService) GetAllContainersStats(composePath string) ([]Contai
 }
 
 // RestartContainer calls the mock function
-func (m *MockComposeService) RestartContainer(composePath string, serviceName string) error {
+func (m *MockComposeService) RestartContainer(composePath, serviceName string) error {
 	if m.RestartContainerFunc != nil {
 		return m.RestartContainerFunc(composePath, serviceName)
 	}
@@ -70,7 +70,7 @@ func (m *MockComposeService) RestartContainer(composePath string, serviceName st
 }
 
 // GetContainerLogs calls the mock function
-func (m *MockComposeService) GetContainerLogs(composePath string, serviceName string, lines int) (string, error) {
+func (m *MockComposeService) GetContainerLogs(composePath, serviceName string, lines int) (string, error) {
 	if m.GetContainerLogsFunc != nil {
 		return m.GetContainerLogsFunc(composePath, serviceName, lines)
 	}
