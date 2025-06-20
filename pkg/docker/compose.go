@@ -3,217 +3,477 @@ package docker
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os/exec"
+	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/client"
 )
 
-// CommandExecutor is an interface for executing commands
-type CommandExecutor interface {
-	Output(name string, args ...string) ([]byte, error)
-	OutputContext(ctx context.Context, name string, args ...string) ([]byte, error)
-	LookPath(file string) (string, error)
-}
-
-// RealCommandExecutor implements CommandExecutor with real exec commands
-type RealCommandExecutor struct{}
-
-// Output executes a command and returns its output
-func (e *RealCommandExecutor) Output(name string, args ...string) ([]byte, error) {
-	cmd := exec.Command(name, args...)
-	return cmd.Output()
-}
-
-// OutputContext executes a command with context and returns its output
-func (e *RealCommandExecutor) OutputContext(ctx context.Context, name string, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
-	return cmd.Output()
-}
-
-// LookPath searches for an executable in PATH
-func (e *RealCommandExecutor) LookPath(file string) (string, error) {
-	return exec.LookPath(file)
-}
-
-// DefaultComposeService implements ComposeService using docker compose CLI
+// DefaultComposeService implements ComposeService using Docker API
 type DefaultComposeService struct {
-	executor CommandExecutor
+	client      *client.Client
+	projectName string
 }
 
 // NewDefaultComposeService creates a new DefaultComposeService
-func NewDefaultComposeService() *DefaultComposeService {
+func NewDefaultComposeService() (*DefaultComposeService, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create docker client: %w", err)
+	}
+
 	return &DefaultComposeService{
-		executor: &RealCommandExecutor{},
+		client: cli,
+	}, nil
+}
+
+// SetProjectName sets the Docker Compose project name
+func (s *DefaultComposeService) SetProjectName(name string) {
+	s.projectName = name
+}
+
+// getProjectName returns the project name to use
+func (s *DefaultComposeService) getProjectName(composePath string) string {
+	if s.projectName != "" {
+		return s.projectName
 	}
+	// デフォルトはディレクトリ名を使用
+	defaultName := filepath.Base(filepath.Dir(composePath))
+	return defaultName
 }
 
-// dockerComposeJSON represents the JSON output from docker compose ps
-type dockerComposeJSON struct {
-	ID         string     `json:"ID"`
-	Name       string     `json:"Name"`
-	Service    string     `json:"Service"`
-	Status     string     `json:"Status"`
-	State      string     `json:"State"`
-	Health     string     `json:"Health"`
-	ExitCode   int        `json:"ExitCode"`
-	Publishers []portInfo `json:"Publishers"`
-}
+// listContainersWithFilter は指定されたフィルターでコンテナを一覧表示する内部メソッド
+func (s *DefaultComposeService) listContainersWithFilter(filterArgs filters.Args) ([]ContainerInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), ListOperationTimeout)
+	defer cancel()
 
-type portInfo struct {
-	URL           string `json:"URL"`
-	TargetPort    int    `json:"TargetPort"`
-	PublishedPort int    `json:"PublishedPort"`
-	Protocol      string `json:"Protocol"`
-}
-
-// ListContainers returns a list of containers managed by docker compose
-func (s *DefaultComposeService) ListContainers(composePath string) ([]ContainerInfo, error) {
-	// Validate compose file path
-	if composePath == "" {
-		composePath = "docker-compose.yml"
-	}
-
-	absPath, err := filepath.Abs(composePath)
+	containers, err := s.client.ContainerList(ctx, container.ListOptions{
+		All:     true, // 停止中のコンテナも含む
+		Filters: filterArgs,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("invalid compose path: %w", err)
+		return nil, err
 	}
 
-	// Run docker compose ps command with JSON format (Docker Compose V2)
-	output, err := s.executor.Output("docker", "compose", "-f", absPath, "ps", "--format", "json")
-	if err != nil {
-		// Check if docker is installed
-		if _, err := s.executor.LookPath("docker"); err != nil {
-			return nil, fmt.Errorf("docker not found: %w", err)
-		}
-		return nil, fmt.Errorf("failed to execute docker compose: %w", err)
-	}
-
-	// Parse JSON output line by line
-	var containers []ContainerInfo
-	trimmedOutput := strings.TrimSpace(string(output))
-	if trimmedOutput == "" {
-		return containers, nil
-	}
-	lines := strings.Split(trimmedOutput, "\n")
-
-	for _, line := range lines {
-		if line == "" {
+	var result []ContainerInfo
+	for _, c := range containers {
+		// コンテナの詳細情報を取得
+		inspect, err := s.client.ContainerInspect(ctx, c.ID)
+		if err != nil {
 			continue
 		}
 
-		var dcContainer dockerComposeJSON
-		if err := json.Unmarshal([]byte(line), &dcContainer); err != nil {
-			return nil, fmt.Errorf("failed to parse JSON: %w", err)
+		// サービス名を取得
+		serviceName := c.Labels[LabelDockerComposeService]
+
+		// ポート情報を整形
+		var ports []string
+		for _, p := range c.Ports {
+			if p.PublicPort > 0 {
+				ports = append(ports, fmt.Sprintf("%d:%d/%s", p.PublicPort, p.PrivatePort, p.Type))
+			}
 		}
 
-		// Convert to ContainerInfo
+		// 状態を判定
+		state := strings.ToLower(inspect.State.Status)
+
+		// ヘルスチェックステータス
+		healthStatus := "none"
+		if inspect.State.Health != nil {
+			healthStatus = inspect.State.Health.Status
+		}
+
+		// 稼働時間を計算
+		var runningFor string
+		if state == "running" && inspect.State.StartedAt != "" {
+			startedAt, err := time.Parse(time.RFC3339Nano, inspect.State.StartedAt)
+			if err == nil {
+				duration := time.Since(startedAt)
+				runningFor = formatDuration(duration)
+			}
+		}
+
 		info := ContainerInfo{
-			ID:           dcContainer.ID,
-			Name:         dcContainer.Name,
-			Service:      dcContainer.Service,
-			Status:       dcContainer.Status,
-			State:        dcContainer.State,
-			HealthStatus: dcContainer.Health,
+			ID:           c.ID[:12],
+			Name:         strings.TrimPrefix(c.Names[0], "/"),
+			Service:      serviceName,
+			Image:        c.Image,
+			Status:       c.Status,
+			State:        state,
+			RunningFor:   runningFor,
+			Ports:        ports,
+			HealthStatus: healthStatus,
+			CreatedAt:    time.Unix(c.Created, 0),
 		}
 
-		// Parse ports
-		for _, port := range dcContainer.Publishers {
-			portStr := fmt.Sprintf("%d", port.TargetPort)
-			if port.PublishedPort != 0 {
-				portStr = fmt.Sprintf("%d:%d", port.PublishedPort, port.TargetPort)
-			}
-			if port.Protocol != "" && port.Protocol != "tcp" {
-				portStr += "/" + port.Protocol
-			}
-			info.Ports = append(info.Ports, portStr)
-		}
+		result = append(result, info)
+	}
 
-		// Extract running time from status
-		if strings.Contains(info.Status, "Up") {
-			parts := strings.Split(info.Status, " ")
-			if len(parts) >= 2 {
-				info.RunningFor = strings.Join(parts[1:], " ")
-			}
-		}
+	return result, nil
+}
 
-		containers = append(containers, info)
+// ListContainers lists all containers managed by docker-compose
+func (s *DefaultComposeService) ListContainers(composePath string) ([]ContainerInfo, error) {
+	projectName := s.getProjectName(composePath)
+
+	// Docker Composeのラベルでフィルター
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("label", fmt.Sprintf("%s=%s", LabelDockerComposeProject, projectName))
+
+	containers, err := s.listContainersWithFilter(filterArgs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
 	return containers, nil
 }
 
-// StartService starts a specific service using docker compose
+// ListGameContainers lists only game containers (with game.type label)
+// Returns containers that have the "game.type" label, excluding
+// infrastructure containers like watchdog
+func (s *DefaultComposeService) ListGameContainers(composePath string) ([]ContainerInfo, error) {
+	projectName := s.getProjectName(composePath)
+
+	// Docker Composeのラベルとgame.typeラベルでフィルター
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("label", fmt.Sprintf("%s=%s", LabelDockerComposeProject, projectName))
+	filterArgs.Add("label", LabelGameType)
+
+	containers, err := s.listContainersWithFilter(filterArgs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers with %s label: %w", LabelGameType, err)
+	}
+
+	return containers, nil
+}
+
+// StartService starts a specific service
 func (s *DefaultComposeService) StartService(composePath string, serviceName string) error {
-	// Validate service name for security
 	if !IsValidServiceName(serviceName) {
 		return fmt.Errorf("%w: %s", ErrInvalidServiceName, serviceName)
 	}
-	
-	// Validate compose file path
-	if composePath == "" {
-		composePath = "docker-compose.yml"
-	}
 
-	absPath, err := filepath.Abs(composePath)
+	projectName := s.getProjectName(composePath)
+
+	// サービスに属するコンテナを検索
+	containers, err := s.findServiceContainers(projectName, serviceName)
 	if err != nil {
-		return fmt.Errorf("invalid compose path: %w", err)
+		return err
 	}
 
-	// Run docker compose start command for specific service with timeout
+	if len(containers) == 0 {
+		return fmt.Errorf("service %s not found", serviceName)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), ServiceOperationTimeout)
 	defer cancel()
-	
-	output, err := s.executor.OutputContext(ctx, "docker", "compose", "-f", absPath, "start", serviceName)
-	if err != nil {
-		// Check if it's a timeout
-		if errors.Is(err, context.DeadlineExceeded) {
-			return fmt.Errorf("start service %s timeout after %v", serviceName, ServiceOperationTimeout)
+
+	// すべてのコンテナを起動
+	for _, c := range containers {
+		if err := s.client.ContainerStart(ctx, c.ID, container.StartOptions{}); err != nil {
+			return fmt.Errorf("failed to start container %s: %w", c.Names[0], err)
 		}
-		// Check if docker is installed
-		if _, err := s.executor.LookPath("docker"); err != nil {
-			return fmt.Errorf("docker not found: %w", err)
-		}
-		return fmt.Errorf("failed to start service %s: %w (output: %s)", serviceName, err, string(output))
 	}
 
 	return nil
 }
 
-// StopService stops a specific service using docker compose
+// StopService stops a specific service
 func (s *DefaultComposeService) StopService(composePath string, serviceName string) error {
-	// Validate service name for security
 	if !IsValidServiceName(serviceName) {
 		return fmt.Errorf("%w: %s", ErrInvalidServiceName, serviceName)
 	}
-	
-	// Validate compose file path
-	if composePath == "" {
-		composePath = "docker-compose.yml"
-	}
 
-	absPath, err := filepath.Abs(composePath)
+	projectName := s.getProjectName(composePath)
+
+	// サービスに属するコンテナを検索
+	containers, err := s.findServiceContainers(projectName, serviceName)
 	if err != nil {
-		return fmt.Errorf("invalid compose path: %w", err)
+		return err
 	}
 
-	// Run docker compose stop command for specific service with timeout
+	if len(containers) == 0 {
+		return fmt.Errorf("service %s not found", serviceName)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), ServiceOperationTimeout)
 	defer cancel()
-	
-	output, err := s.executor.OutputContext(ctx, "docker", "compose", "-f", absPath, "stop", serviceName)
-	if err != nil {
-		// Check if it's a timeout
-		if errors.Is(err, context.DeadlineExceeded) {
-			return fmt.Errorf("stop service %s timeout after %v", serviceName, ServiceOperationTimeout)
+
+	// すべてのコンテナを停止
+	for _, c := range containers {
+		if err := s.client.ContainerStop(ctx, c.ID, container.StopOptions{}); err != nil {
+			return fmt.Errorf("failed to stop container %s: %w", c.Names[0], err)
 		}
-		// Check if docker is installed
-		if _, err := s.executor.LookPath("docker"); err != nil {
-			return fmt.Errorf("docker not found: %w", err)
-		}
-		return fmt.Errorf("failed to stop service %s: %w (output: %s)", serviceName, err, string(output))
 	}
 
+	return nil
+}
+
+// GetContainerStats gets resource usage stats for a specific container
+func (s *DefaultComposeService) GetContainerStats(containerName string) (*ContainerStats, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), QueryOperationTimeout)
+	defer cancel()
+
+	// コンテナ名でフィルター
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("name", containerName)
+
+	containers, err := s.client.ContainerList(ctx, container.ListOptions{
+		Filters: filterArgs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to find container: %w", err)
+	}
+
+	if len(containers) == 0 {
+		return nil, fmt.Errorf("container %s not found", containerName)
+	}
+
+	// Stats APIを呼び出し
+	statsResponse, err := s.client.ContainerStats(ctx, containers[0].ID, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container stats: %w", err)
+	}
+	defer statsResponse.Body.Close()
+
+	// 統計情報を読み取り
+	data, err := io.ReadAll(statsResponse.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read stats: %w", err)
+	}
+
+	var stats container.StatsResponse
+	if err := json.Unmarshal(data, &stats); err != nil {
+		return nil, fmt.Errorf("failed to parse stats: %w", err)
+	}
+
+	// CPU使用率を計算
+	cpuPercent := calculateCPUPercent(&stats)
+
+	// メモリ使用率を計算
+	memPercent := float64(stats.MemoryStats.Usage) / float64(stats.MemoryStats.Limit) * 100.0
+	memUsage := fmt.Sprintf("%.2fGiB / %.2fGiB",
+		float64(stats.MemoryStats.Usage)/1024/1024/1024,
+		float64(stats.MemoryStats.Limit)/1024/1024/1024)
+
+	// ネットワークI/Oを計算
+	var rxBytes, txBytes uint64
+	for _, v := range stats.Networks {
+		rxBytes += v.RxBytes
+		txBytes += v.TxBytes
+	}
+	networkIO := fmt.Sprintf("%s / %s", formatBytes(rxBytes), formatBytes(txBytes))
+
+	// ブロックI/Oを計算
+	var readBytes, writeBytes uint64
+	for _, v := range stats.BlkioStats.IoServiceBytesRecursive {
+		switch v.Op {
+		case "read":
+			readBytes += v.Value
+		case "write":
+			writeBytes += v.Value
+		}
+	}
+	blockIO := fmt.Sprintf("%s / %s", formatBytes(readBytes), formatBytes(writeBytes))
+
+	return &ContainerStats{
+		ContainerID:   containers[0].ID[:12],
+		Name:          strings.TrimPrefix(containers[0].Names[0], "/"),
+		CPUPercent:    cpuPercent,
+		MemoryPercent: memPercent,
+		MemoryUsage:   memUsage,
+		NetworkIO:     networkIO,
+		BlockIO:       blockIO,
+	}, nil
+}
+
+// GetAllContainersStats gets resource usage stats for all containers
+func (s *DefaultComposeService) GetAllContainersStats(composePath string) ([]ContainerStats, error) {
+	containers, err := s.ListContainers(composePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var stats []ContainerStats
+	for _, container := range containers {
+		if strings.ToLower(container.State) == "running" {
+			stat, err := s.GetContainerStats(container.Name)
+			if err != nil {
+				continue
+			}
+			stats = append(stats, *stat)
+		}
+	}
+
+	return stats, nil
+}
+
+// RestartContainer restarts a specific container
+func (s *DefaultComposeService) RestartContainer(composePath string, serviceName string) error {
+	if !IsValidServiceName(serviceName) {
+		return fmt.Errorf("%w: %s", ErrInvalidServiceName, serviceName)
+	}
+
+	projectName := s.getProjectName(composePath)
+
+	// サービスに属するコンテナを検索
+	containers, err := s.findServiceContainers(projectName, serviceName)
+	if err != nil {
+		return err
+	}
+
+	if len(containers) == 0 {
+		return fmt.Errorf("service %s not found", serviceName)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), ServiceOperationTimeout)
+	defer cancel()
+
+	// すべてのコンテナを再起動
+	for _, c := range containers {
+		if err := s.client.ContainerRestart(ctx, c.ID, container.StopOptions{}); err != nil {
+			return fmt.Errorf("failed to restart container %s: %w", c.Names[0], err)
+		}
+	}
+
+	return nil
+}
+
+// GetContainerLogs gets logs from a specific container
+func (s *DefaultComposeService) GetContainerLogs(composePath string, serviceName string, lines int) (string, error) {
+	if !IsValidServiceName(serviceName) {
+		return "", fmt.Errorf("%w: %s", ErrInvalidServiceName, serviceName)
+	}
+
+	if lines <= 0 {
+		lines = 100
+	} else if lines > 1000 {
+		lines = 1000
+	}
+
+	projectName := s.getProjectName(composePath)
+
+	// サービスに属するコンテナを検索
+	containers, err := s.findServiceContainers(projectName, serviceName)
+	if err != nil {
+		return "", err
+	}
+
+	if len(containers) == 0 {
+		return "", fmt.Errorf("service %s not found", serviceName)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), ListOperationTimeout)
+	defer cancel()
+
+	// ログを取得
+	options := container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       strconv.Itoa(lines),
+		Timestamps: false,
+	}
+
+	logsReader, err := s.client.ContainerLogs(ctx, containers[0].ID, options)
+	if err != nil {
+		return "", fmt.Errorf("failed to get logs: %w", err)
+	}
+	defer logsReader.Close()
+
+	// ログを読み取り
+	logs, err := io.ReadAll(logsReader)
+	if err != nil {
+		return "", fmt.Errorf("failed to read logs: %w", err)
+	}
+
+	// Docker APIのログは特殊なフォーマットなので、クリーンアップ
+	return cleanDockerLogs(string(logs)), nil
+}
+
+// findServiceContainers finds containers belonging to a specific service
+func (s *DefaultComposeService) findServiceContainers(projectName, serviceName string) ([]container.Summary, error) {
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("label", fmt.Sprintf("%s=%s", LabelDockerComposeProject, projectName))
+	filterArgs.Add("label", fmt.Sprintf("%s=%s", LabelDockerComposeService, serviceName))
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryOperationTimeout)
+	defer cancel()
+
+	return s.client.ContainerList(ctx, container.ListOptions{
+		All:     true,
+		Filters: filterArgs,
+	})
+}
+
+// calculateCPUPercent calculates CPU usage percentage
+func calculateCPUPercent(stats *container.StatsResponse) float64 {
+	// CPU使用率の計算（Docker公式の方法）
+	cpuDelta := float64(stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage)
+	systemDelta := float64(stats.CPUStats.SystemUsage - stats.PreCPUStats.SystemUsage)
+
+	if systemDelta > 0.0 && cpuDelta > 0.0 {
+		cpuPercent := (cpuDelta / systemDelta) * float64(len(stats.CPUStats.CPUUsage.PercpuUsage)) * 100.0
+		return cpuPercent
+	}
+
+	return 0.0
+}
+
+// formatDuration formats a duration into a human-readable string
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	} else if d < time.Hour {
+		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
+	} else if d < 24*time.Hour {
+		return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
+	}
+	days := int(d.Hours()) / 24
+	hours := int(d.Hours()) % 24
+	return fmt.Sprintf("%dd%dh", days, hours)
+}
+
+// formatBytes formats bytes into a human-readable string
+func formatBytes(bytes uint64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%dB", bytes)
+	}
+	div, exp := uint64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f%cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// cleanDockerLogs removes Docker's log format headers
+func cleanDockerLogs(logs string) string {
+	lines := strings.Split(logs, "\n")
+	var cleaned []string
+
+	for _, line := range lines {
+		// Docker APIのログは各行の先頭に8バイトのヘッダーがある
+		if len(line) > 8 {
+			cleaned = append(cleaned, line[8:])
+		} else if line != "" {
+			cleaned = append(cleaned, line)
+		}
+	}
+
+	return strings.Join(cleaned, "\n")
+}
+
+// Close closes the Docker client connection
+func (s *DefaultComposeService) Close() error {
+	if s.client != nil {
+		return s.client.Close()
+	}
 	return nil
 }
