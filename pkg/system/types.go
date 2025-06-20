@@ -1,6 +1,8 @@
 package system
 
 // SystemInfo はシステム情報を表す構造体
+//
+//nolint:revive // package名とtype名の組み合わせ (system.SystemInfo) は意図的
 type SystemInfo struct {
 	CPUUsagePercent   float64
 	MemoryUsedGB      float64

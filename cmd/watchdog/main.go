@@ -1,3 +1,4 @@
+// Package main は Game Server Watchdog のエントリポイントです
 package main
 
 import (

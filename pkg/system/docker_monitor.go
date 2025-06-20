@@ -1,6 +1,7 @@
 //go:build linux
 // +build linux
 
+// Package system はシステム情報の監視機能を提供します
 package system
 
 import (
@@ -131,6 +132,7 @@ type cpuStat struct {
 // readCPUStat は/proc/statからCPU統計を読み取る
 func (m *DockerAwareMonitor) readCPUStat() (*cpuStat, error) {
 	statPath := filepath.Join(m.hostProcPath, "stat")
+	// #nosec G304 - パスはコンストラクタで検証済みのホストprocパスとコントロールされたファイル名の組み合わせ
 	file, err := os.Open(statPath)
 	if err != nil {
 		// ホストのprocがマウントされていない場合は通常のprocを試す
@@ -179,6 +181,7 @@ type memoryInfo struct {
 // getHostMemoryInfo はホストのメモリ情報を取得
 func (m *DockerAwareMonitor) getHostMemoryInfo() (*memoryInfo, error) {
 	meminfoPath := filepath.Join(m.hostProcPath, "meminfo")
+	// #nosec G304 - パスはコンストラクタで検証済みのホストprocパスとコントロールされたファイル名の組み合わせ
 	file, err := os.Open(meminfoPath)
 	if err != nil {
 		// ホストのprocがマウントされていない場合は通常のprocを試す
@@ -250,13 +253,15 @@ func (m *DockerAwareMonitor) getDiskUsage(path string) (*diskInfo, error) {
 	}
 
 	// syscallを使用してファイルシステムの統計情報を取得
-	// この実装はLinux固有
 	var statfs syscallStatfs
 	if err := syscallStatfsFunc(path, &statfs); err != nil {
 		return nil, err
 	}
 
 	// ブロックサイズとブロック数から容量を計算
+	if statfs.Bsize < 0 {
+		return nil, fmt.Errorf("invalid block size: %d", statfs.Bsize)
+	}
 	blockSize := uint64(statfs.Bsize)
 	totalBlocks := statfs.Blocks
 	freeBlocks := statfs.Bavail
