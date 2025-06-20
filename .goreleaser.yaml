@@ -102,6 +102,7 @@ release:
 
 # Dockerイメージの作成
 dockers:
+  # AMD64アーキテクチャ用
   - image_templates:
       - "ghcr.io/hidea88/game-server-watchdog:{{ .Tag }}"
       - "ghcr.io/hidea88/game-server-watchdog:v{{ .Major }}"
@@ -110,7 +111,6 @@ dockers:
     goos: linux
     goarch: amd64
     dockerfile: Dockerfile
-    use: buildx
     build_flag_templates:
       - "--pull"
       - "--label=org.opencontainers.image.created={{.Date}}"
@@ -119,4 +119,3 @@ dockers:
       - "--label=org.opencontainers.image.version={{.Version}}"
       - "--label=org.opencontainers.image.source=https://github.com/hideA88/game-server-watchdog"
       - "--label=org.opencontainers.image.description=Game Server Watchdog - Discord bot for monitoring game servers"
-      - "--platform=linux/amd64,linux/arm64"
