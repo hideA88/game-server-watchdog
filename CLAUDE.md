@@ -12,9 +12,12 @@
 
 ### 環境変数 (.env)
 - `DISCORD_TOKEN`: Discord botトークン（必須）
+- `DEBUG_MODE`: デバッグモード（true/false、デフォルト: false）
+- `LOG_LEVEL`: ログレベル（debug/info/warn/error、**大文字小文字を区別しない**、デフォルト: info）
 - `ALLOWED_CHANNEL_IDS`: 許可されたチャンネルID（カンマ区切り）
 - `ALLOWED_USER_IDS`: 許可されたユーザーID（カンマ区切り）
 - `DOCKER_COMPOSE_PATH`: docker-compose.ymlのパス（デフォルト: docker-compose.yml）
+- `DOCKER_COMPOSE_PROJECT_NAME`: Docker Composeプロジェクト名（デフォルト: 空）
 
 ### アクセス制限
 - 特定のチャンネルIDのみでボットが反応するよう制限済み
@@ -49,6 +52,67 @@
 1. `internal/bot/handler/`に新しいハンドラーファイルを作成
 2. `handler.NewHandlers()`に追加
 3. メンションチェックを必ず実装
+
+### ログシステム
+
+#### 概要
+構造化ロギングを採用し、context-basedでロガーを管理しています。
+
+#### ログレベルの設定
+優先順位（高い方が優先）：
+1. `LOG_LEVEL`環境変数: `debug`, `info`, `warn`, `error`（**大文字小文字を区別しない**）
+2. `DEBUG_MODE`環境変数: `true`の場合はDebugレベル、それ以外はInfoレベル
+
+```bash
+# デバッグモードで起動
+DEBUG_MODE=true ./watchdog
+
+# 特定のログレベルで起動（以下はすべて同じ動作）
+LOG_LEVEL=warn ./watchdog
+LOG_LEVEL=WARN ./watchdog
+LOG_LEVEL=Warn ./watchdog
+```
+
+#### 使い方
+
+```go
+// 基本的な使い方（configから設定を渡す）
+logger, err := logging.New(cfg.DebugMode, cfg.LogLevel)
+
+// または、詳細な設定を指定して作成
+logger, err := logging.NewWithConfig(&logging.Config{
+    Level:       logging.InfoLevel,
+    Development: false,
+    Format:      "json",
+})
+
+// contextからロガーを取得
+logger := logging.FromContext(ctx)
+
+// ログ出力
+logger.Info(ctx, "メッセージ", 
+    logging.String("key", "value"),
+    logging.Int("count", 42))
+
+// エラーログ
+logger.Error(ctx, "エラーが発生", logging.ErrorField(err))
+
+// 新しいフィールドを追加
+subLogger := logger.With(logging.String("component", "discord"))
+
+// 名前付きロガー
+namedLogger := logger.Named("subsystem")
+```
+
+#### contextへのロガー設定
+
+```go
+// ロガーをcontextに設定
+ctx = logging.WithContext(ctx, logger)
+
+// contextからロガーを取得（存在しない場合はnopLogger）
+logger = logging.FromContext(ctx)
+```
 
 ### テストの書き方
 
