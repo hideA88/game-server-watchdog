@@ -2,6 +2,8 @@
 # GoReleaserの設定ファイル
 # https://goreleaser.com/customization/
 
+version: 2
+
 project_name: game-server-watchdog
 
 before:
