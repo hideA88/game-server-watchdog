@@ -4,6 +4,8 @@ import (
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/hideA88/game-server-watchdog/pkg/logging"
 )
 
 func TestLoad(t *testing.T) {
@@ -31,12 +33,15 @@ func TestLoad(t *testing.T) {
 			envVars: map[string]string{
 				"DISCORD_TOKEN":       "test-token",
 				"DEBUG_MODE":          "true",
+				"LOG_LEVEL":           "debug",
 				"ALLOWED_CHANNEL_IDS": "123,456,789",
 				"ALLOWED_USER_IDS":    "111,222,333",
 			},
 			want: &Config{
 				DiscordToken:             "test-token",
 				DebugMode:                true,
+				LogLevel:                 logging.DebugLevel,
+				LogLevelStr:              "debug",
 				AllowedChannelIDs:        []string{"123", "456", "789"},
 				AllowedUserIDs:           []string{"111", "222", "333"},
 				DockerComposePath:        "docker-compose.yml",
@@ -52,6 +57,8 @@ func TestLoad(t *testing.T) {
 			want: &Config{
 				DiscordToken:             "test-token",
 				DebugMode:                false,
+				LogLevel:                 logging.InfoLevel,
+				LogLevelStr:              "",
 				AllowedChannelIDs:        nil,
 				AllowedUserIDs:           nil,
 				DockerComposePath:        "docker-compose.yml",
@@ -78,6 +85,8 @@ func TestLoad(t *testing.T) {
 			want: &Config{
 				DiscordToken:             "test-token",
 				DebugMode:                false,
+				LogLevel:                 logging.InfoLevel,
+				LogLevelStr:              "",
 				AllowedChannelIDs:        []string{},
 				AllowedUserIDs:           []string{},
 				DockerComposePath:        "docker-compose.yml",
@@ -93,6 +102,8 @@ func TestLoad(t *testing.T) {
 			want: &Config{
 				DiscordToken:             "test-token",
 				DebugMode:                false,
+				LogLevel:                 logging.InfoLevel,
+				LogLevelStr:              "",
 				AllowedChannelIDs:        nil,
 				AllowedUserIDs:           nil,
 				DockerComposePath:        "docker-compose.yml",
@@ -110,13 +121,139 @@ func TestLoad(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "有効なログレベル（info）",
+			envVars: map[string]string{
+				"DISCORD_TOKEN": "test-token",
+				"LOG_LEVEL":     "info",
+			},
+			want: &Config{
+				DiscordToken:             "test-token",
+				DebugMode:                false,
+				LogLevel:                 logging.InfoLevel,
+				LogLevelStr:              "info",
+				AllowedChannelIDs:        nil,
+				AllowedUserIDs:           nil,
+				DockerComposePath:        "docker-compose.yml",
+				DockerComposeProjectName: "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "有効なログレベル（warn）",
+			envVars: map[string]string{
+				"DISCORD_TOKEN": "test-token",
+				"LOG_LEVEL":     "warn",
+			},
+			want: &Config{
+				DiscordToken:             "test-token",
+				DebugMode:                false,
+				LogLevel:                 logging.WarnLevel,
+				LogLevelStr:              "warn",
+				AllowedChannelIDs:        nil,
+				AllowedUserIDs:           nil,
+				DockerComposePath:        "docker-compose.yml",
+				DockerComposeProjectName: "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "有効なログレベル（error）",
+			envVars: map[string]string{
+				"DISCORD_TOKEN": "test-token",
+				"LOG_LEVEL":     "error",
+			},
+			want: &Config{
+				DiscordToken:             "test-token",
+				DebugMode:                false,
+				LogLevel:                 logging.ErrorLevel,
+				LogLevelStr:              "error",
+				AllowedChannelIDs:        nil,
+				AllowedUserIDs:           nil,
+				DockerComposePath:        "docker-compose.yml",
+				DockerComposeProjectName: "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "無効なログレベル",
+			envVars: map[string]string{
+				"DISCORD_TOKEN": "test-token",
+				"LOG_LEVEL":     "invalid",
+			},
+			want: &Config{
+				DiscordToken:             "test-token",
+				DebugMode:                false,
+				LogLevel:                 logging.InfoLevel, // デフォルト値
+				LogLevelStr:              "invalid",
+				AllowedChannelIDs:        nil,
+				AllowedUserIDs:           nil,
+				DockerComposePath:        "docker-compose.yml",
+				DockerComposeProjectName: "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "大文字のログレベル（DEBUG）",
+			envVars: map[string]string{
+				"DISCORD_TOKEN": "test-token",
+				"LOG_LEVEL":     "DEBUG",
+			},
+			want: &Config{
+				DiscordToken:             "test-token",
+				DebugMode:                false,
+				LogLevel:                 logging.DebugLevel,
+				LogLevelStr:              "DEBUG",
+				AllowedChannelIDs:        nil,
+				AllowedUserIDs:           nil,
+				DockerComposePath:        "docker-compose.yml",
+				DockerComposeProjectName: "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "混在大文字小文字のログレベル（Info）",
+			envVars: map[string]string{
+				"DISCORD_TOKEN": "test-token",
+				"LOG_LEVEL":     "Info",
+			},
+			want: &Config{
+				DiscordToken:             "test-token",
+				DebugMode:                false,
+				LogLevel:                 logging.InfoLevel,
+				LogLevelStr:              "Info",
+				AllowedChannelIDs:        nil,
+				AllowedUserIDs:           nil,
+				DockerComposePath:        "docker-compose.yml",
+				DockerComposeProjectName: "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "大文字のログレベル（WARN）",
+			envVars: map[string]string{
+				"DISCORD_TOKEN": "test-token",
+				"LOG_LEVEL":     "WARN",
+			},
+			want: &Config{
+				DiscordToken:             "test-token",
+				DebugMode:                false,
+				LogLevel:                 logging.WarnLevel,
+				LogLevelStr:              "WARN",
+				AllowedChannelIDs:        nil,
+				AllowedUserIDs:           nil,
+				DockerComposePath:        "docker-compose.yml",
+				DockerComposeProjectName: "",
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 既存の環境変数を保存
 			originalEnv := make(map[string]string)
-			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS", "DOCKER_COMPOSE_PATH", "DOCKER_COMPOSE_PROJECT_NAME"}
+			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "LOG_LEVEL", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS", "DOCKER_COMPOSE_PATH", "DOCKER_COMPOSE_PROJECT_NAME"}
 			for _, key := range envKeys {
 				originalEnv[key] = os.Getenv(key)
 				os.Unsetenv(key)
@@ -214,6 +351,8 @@ ALLOWED_USER_IDS=333,444`,
 			want: &Config{
 				DiscordToken:             "env-file-token",
 				DebugMode:                true,
+				LogLevel:                 logging.InfoLevel,
+				LogLevelStr:              "",
 				AllowedChannelIDs:        []string{"111", "222"},
 				AllowedUserIDs:           []string{"333", "444"},
 				DockerComposePath:        "docker-compose.yml",
@@ -226,7 +365,7 @@ ALLOWED_USER_IDS=333,444`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 環境変数をクリア
-			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS", "DOCKER_COMPOSE_PATH", "DOCKER_COMPOSE_PROJECT_NAME"}
+			envKeys := []string{"DISCORD_TOKEN", "DEBUG_MODE", "LOG_LEVEL", "ALLOWED_CHANNEL_IDS", "ALLOWED_USER_IDS", "DOCKER_COMPOSE_PATH", "DOCKER_COMPOSE_PROJECT_NAME"}
 			originalEnv := make(map[string]string)
 			for _, key := range envKeys {
 				originalEnv[key] = os.Getenv(key)
