@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"strings"
@@ -111,11 +112,22 @@ func TestMockComposeService(t *testing.T) {
 
 // MockCommandExecutor is a mock implementation of CommandExecutor
 type MockCommandExecutor struct {
-	OutputFunc   func(name string, args ...string) ([]byte, error)
-	LookPathFunc func(file string) (string, error)
+	OutputFunc        func(name string, args ...string) ([]byte, error)
+	OutputContextFunc func(ctx context.Context, name string, args ...string) ([]byte, error)
+	LookPathFunc      func(file string) (string, error)
 }
 
 func (m *MockCommandExecutor) Output(name string, args ...string) ([]byte, error) {
+	if m.OutputFunc != nil {
+		return m.OutputFunc(name, args...)
+	}
+	return nil, nil
+}
+
+func (m *MockCommandExecutor) OutputContext(ctx context.Context, name string, args ...string) ([]byte, error) {
+	if m.OutputContextFunc != nil {
+		return m.OutputContextFunc(ctx, name, args...)
+	}
 	if m.OutputFunc != nil {
 		return m.OutputFunc(name, args...)
 	}
