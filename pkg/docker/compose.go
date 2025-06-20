@@ -45,7 +45,14 @@ func (s *DefaultComposeService) getProjectName(composePath string) string {
 		return s.projectName
 	}
 	// デフォルトはディレクトリ名を使用
-	defaultName := filepath.Base(filepath.Dir(composePath))
+	dir := filepath.Dir(composePath)
+	defaultName := filepath.Base(dir)
+	
+	// ルートディレクトリの場合は空文字列を返す
+	if defaultName == "/" || defaultName == "." {
+		return ""
+	}
+	
 	return defaultName
 }
 
@@ -487,9 +494,12 @@ func cleanDockerLogs(logs string) string {
 
 	for _, line := range lines {
 		// Docker APIのログは各行の先頭に8バイトのヘッダーがある
-		if len(line) > 8 {
+		// ヘッダーは通常 \x01\x00\x00\x00\x00\x00\x00\x?? の形式
+		if len(line) > 8 && line[0] <= 0x02 && line[1] == 0x00 {
+			// Dockerヘッダーがある場合は削除
 			cleaned = append(cleaned, line[8:])
 		} else if line != "" {
+			// 通常のログ行はそのまま保持
 			cleaned = append(cleaned, line)
 		}
 	}

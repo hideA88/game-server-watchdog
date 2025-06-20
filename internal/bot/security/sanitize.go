@@ -9,11 +9,11 @@ import (
 var (
 	// tokenPatterns はトークンのようなセンシティブな情報を検出する正規表現
 	tokenPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`(?i)token[:\s]*[a-zA-Z0-9.\-_]{20,}`),
-		regexp.MustCompile(`(?i)secret[:\s]*[a-zA-Z0-9.\-_]{20,}`),
-		regexp.MustCompile(`(?i)password[:\s]*[a-zA-Z0-9.\-_]{8,}`),
-		regexp.MustCompile(`(?i)key[:\s]*[a-zA-Z0-9.\-_]{20,}`),
-		regexp.MustCompile(`(?i)api[_\s]*key[:\s]*[a-zA-Z0-9.\-_]{20,}`),
+		regexp.MustCompile(`(?i)(token[:\s]+)([\x60]?)([a-zA-Z0-9.\-_+]{8,})([\x60]?)`), // \x60 = backtick
+		regexp.MustCompile(`(?i)(secret[:\s]+)([\x60]?)([a-zA-Z0-9.\-_+]{6,})([\x60]?)`), // secretは6文字以上
+		regexp.MustCompile(`(?i)(password[:\s]+)([\x60]?)([a-zA-Z0-9.\-_+]{4,})([\x60]?)`),
+		regexp.MustCompile(`(?i)(key[:\s]+)([\x60]?)([a-zA-Z0-9.\-_+]{8,})([\x60]?)`),
+		regexp.MustCompile(`(?i)(api[_\s]*key[:\s]+)([\x60]?)([a-zA-Z0-9.\-_+]{8,})([\x60]?)`),
 	}
 
 	// pathPatterns はファイルパスのような情報を検出する正規表現
@@ -24,8 +24,8 @@ var (
 
 	// ipPatterns はIPアドレスを検出する正規表現
 	ipPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`),
-		regexp.MustCompile(`\b[0-9a-fA-F:]+:[0-9a-fA-F:]+\b`), // IPv6の簡易パターン
+		regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b`), // IPv4（ポート番号含む）
+		regexp.MustCompile(`\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{0,4}\b`), // IPv6の改良パターン
 	}
 )
 
@@ -35,13 +35,7 @@ func SanitizeErrorMessage(message string) string {
 
 	// トークンやシークレットを削除
 	for _, pattern := range tokenPatterns {
-		sanitized = pattern.ReplaceAllStringFunc(sanitized, func(match string) string {
-			parts := strings.SplitN(match, ":", 2)
-			if len(parts) == 2 {
-				return parts[0] + ": [REDACTED]"
-			}
-			return "[REDACTED]"
-		})
+		sanitized = pattern.ReplaceAllString(sanitized, "${1}${2}[REDACTED]${4}")
 	}
 
 	// ファイルパスを削除（ただし、一般的でないパスのみ）
@@ -91,10 +85,18 @@ func SanitizeForDiscord(message string) string {
 func isCommonPath(path string) bool {
 	commonPaths := []string{
 		"/tmp", "/var", "/usr", "/etc", "/opt", "/bin", "/sbin",
-		"/proc", "/sys", "/dev", "/run", "/home",
+		"/proc", "/sys", "/dev", "/run",
 	}
 
 	path = strings.ToLower(path)
+	
+	// /homeは特別扱い - /home/username までは保持、それ以降の個人ファイルは隠す
+	if strings.HasPrefix(path, "/home/") {
+		parts := strings.Split(path, "/")
+		// /home/username までは一般的、それ以下の深いパスは非一般的
+		return len(parts) <= 3
+	}
+	
 	for _, common := range commonPaths {
 		if strings.HasPrefix(path, common) {
 			return true
@@ -106,18 +108,20 @@ func isCommonPath(path string) bool {
 
 // isLocalOrPrivateIP はローカルまたはプライベートIPアドレスかどうかを判定します
 func isLocalOrPrivateIP(ip string) bool {
-	// IPv4の場合
+	// IPv4の場合（ポート番号を含む可能性がある）
 	if strings.Contains(ip, ".") {
-		if strings.HasPrefix(ip, "127.") ||
-			strings.HasPrefix(ip, "10.") ||
-			strings.HasPrefix(ip, "192.168.") ||
-			strings.HasPrefix(ip, "172.") {
+		// ポート番号を削除してIPアドレス部分だけを取得
+		ipOnly := strings.Split(ip, ":")[0]
+		if strings.HasPrefix(ipOnly, "127.") ||
+			strings.HasPrefix(ipOnly, "10.") ||
+			strings.HasPrefix(ipOnly, "192.168.") ||
+			strings.HasPrefix(ipOnly, "172.") {
 			return true
 		}
 	}
 
 	// IPv6の場合（簡易判定）
-	if strings.Contains(ip, ":") {
+	if strings.Contains(ip, ":") && !strings.Contains(ip, ".") {
 		if strings.HasPrefix(ip, "::1") ||
 			strings.HasPrefix(ip, "fe80:") ||
 			strings.HasPrefix(ip, "fc00:") ||

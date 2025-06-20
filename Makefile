@@ -22,6 +22,11 @@ test: ## テストを実行
 	@echo "Running tests..."
 	@go tool gotestsum --format testname -- -v -race -cover ./...
 
+.PHONY: test-short
+test-short: ## テストを実行（integration testをスキップ）
+	@echo "Running tests (short mode)..."
+	@go tool gotestsum --format testname -- -v -race -cover -short ./...
+
 .PHONY: test-coverage
 test-coverage: ## カバレッジ付きでテストを実行
 	@echo "Running tests with coverage..."
