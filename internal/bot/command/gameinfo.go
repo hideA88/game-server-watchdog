@@ -2,15 +2,19 @@ package command
 
 import (
 	"fmt"
+	"log"
 	"strings"
+	"sync"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
 )
 
 // GameInfoCommand handles the game-info command
 type GameInfoCommand struct {
-	compose     docker.ComposeService
-	composePath string
+	compose           docker.ComposeService
+	composePath       string
+	serviceOperations *sync.Map // サービス名をキーとした操作ロック
 }
 
 // NewGameInfoCommand creates a new GameInfoCommand
@@ -19,8 +23,9 @@ func NewGameInfoCommand(compose docker.ComposeService, composePath string) *Game
 		composePath = "docker-compose.yml"
 	}
 	return &GameInfoCommand{
-		compose:     compose,
-		composePath: composePath,
+		compose:           compose,
+		composePath:       composePath,
+		serviceOperations: &sync.Map{},
 	}
 }
 
@@ -52,7 +57,7 @@ func (c *GameInfoCommand) Execute(args []string) (string, error) {
 		// Service name with icon
 		icon := getGameIcon(container.Service)
 		builder.WriteString(fmt.Sprintf("%s **%s** (%s)\n", icon,
-			formatServiceName(container.Service), container.Service))
+			FormatServiceName(container.Service), container.Service))
 
 		// Container name
 		builder.WriteString(fmt.Sprintf("  コンテナ: %s\n", container.Name))
@@ -130,8 +135,8 @@ func getHealthIcon(health string) string {
 	}
 }
 
-// formatServiceName formats the service name for display
-func formatServiceName(service string) string {
+// FormatServiceName formats the service name for display
+func FormatServiceName(service string) string {
 	// Capitalize and format common game names
 	switch strings.ToLower(service) {
 	case "minecraft":
@@ -150,5 +155,168 @@ func formatServiceName(service string) string {
 			return strings.ToUpper(service[:1]) + service[1:]
 		}
 		return service
+	}
+}
+
+// GetComponents returns Discord message components for the game info command
+func (c *GameInfoCommand) GetComponents(args []string) ([]discordgo.MessageComponent, error) {
+	containers, err := c.compose.ListContainers(c.composePath)
+	if err != nil {
+		return nil, fmt.Errorf("コンテナ情報の取得に失敗しました: %w", err)
+	}
+
+	var components []discordgo.MessageComponent
+	var buttons []discordgo.MessageComponent
+
+	// ボタン数のカウント（最大値を超えないように）
+	buttonCount := 0
+	for _, container := range containers {
+		// 最大ボタン数に達したら終了
+		if buttonCount >= docker.MaxTotalButtons {
+			break
+		}
+		// 停止中のコンテナに対しては起動ボタンを追加
+		if strings.ToLower(container.State) == "stopped" || strings.ToLower(container.State) == "exited" {
+			button := discordgo.Button{
+				Label:    fmt.Sprintf("🚀 %s を起動", FormatServiceName(container.Service)),
+				Style:    discordgo.SuccessButton,
+				CustomID: fmt.Sprintf("start_service_%s", container.Service),
+			}
+			buttons = append(buttons, button)
+			buttonCount++
+		} else if strings.ToLower(container.State) == "running" {
+			// 稼働中のコンテナに対しては停止ボタンを追加
+			button := discordgo.Button{
+				Label:    fmt.Sprintf("🛑 %s を停止", FormatServiceName(container.Service)),
+				Style:    discordgo.DangerButton,
+				CustomID: fmt.Sprintf("stop_service_%s", container.Service),
+			}
+			buttons = append(buttons, button)
+			buttonCount++
+		}
+	}
+
+	// ボタンがある場合のみコンポーネントを返す
+	if len(buttons) > 0 {
+		// MaxButtonsPerRow個ずつのボタンをアクションローに分割
+		for i := 0; i < len(buttons); i += docker.MaxButtonsPerRow {
+			end := i + docker.MaxButtonsPerRow
+			if end > len(buttons) {
+				end = len(buttons)
+			}
+			
+			row := discordgo.ActionsRow{
+				Components: buttons[i:end],
+			}
+			components = append(components, row)
+			
+			// 最大MaxButtonRows行まで
+			if len(components) >= docker.MaxButtonRows {
+				break
+			}
+		}
+	}
+
+	return components, nil
+}
+
+// StartService starts a specific service
+func (c *GameInfoCommand) StartService(serviceName string) error {
+	return c.compose.StartService(c.composePath, serviceName)
+}
+
+// StopService stops a specific service
+func (c *GameInfoCommand) StopService(serviceName string) error {
+	return c.compose.StopService(c.composePath, serviceName)
+}
+
+// CanHandle は指定されたカスタムIDを処理できるかどうかを返す
+func (c *GameInfoCommand) CanHandle(customID string) bool {
+	return strings.HasPrefix(customID, "start_service_") || strings.HasPrefix(customID, "stop_service_")
+}
+
+// HandleInteraction はサービスの起動/停止インタラクションを処理する
+func (c *GameInfoCommand) HandleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	if i.Type != discordgo.InteractionMessageComponent {
+		return fmt.Errorf("unexpected interaction type: %v", i.Type)
+	}
+
+	data := i.MessageComponentData()
+	
+	// サービス名と操作を判定
+	var serviceName string
+	var isStart bool
+	
+	if strings.HasPrefix(data.CustomID, "start_service_") {
+		serviceName = strings.TrimPrefix(data.CustomID, "start_service_")
+		isStart = true
+	} else if strings.HasPrefix(data.CustomID, "stop_service_") {
+		serviceName = strings.TrimPrefix(data.CustomID, "stop_service_")
+		isStart = false
+	} else {
+		return fmt.Errorf("unknown custom ID: %s", data.CustomID)
+	}
+	
+	// 操作ロックをチェック
+	if _, loaded := c.serviceOperations.LoadOrStore(serviceName, true); loaded {
+		return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: fmt.Sprintf("⚠️ %s は現在操作中です。しばらくお待ちください。", FormatServiceName(serviceName)),
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+	}
+	
+	// Defer応答を送信（3秒以内）
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
+	if err != nil {
+		c.serviceOperations.Delete(serviceName)
+		return fmt.Errorf("failed to send defer response: %w", err)
+	}
+
+	// サービス操作処理を実行
+	go c.handleServiceOperation(s, i, serviceName, isStart)
+	
+	return nil
+}
+
+// handleServiceOperation はサービスの起動/停止処理を行う
+func (c *GameInfoCommand) handleServiceOperation(s *discordgo.Session, i *discordgo.InteractionCreate, serviceName string, isStart bool) {
+	// 処理完了時にロックを解放
+	defer c.serviceOperations.Delete(serviceName)
+	
+	// サービス操作を実行
+	var err error
+	var successMessage string
+	var errorPrefix string
+	
+	if isStart {
+		err = c.StartService(serviceName)
+		successMessage = fmt.Sprintf("✅ %s を起動しました！", FormatServiceName(serviceName))
+		errorPrefix = "起動"
+	} else {
+		err = c.StopService(serviceName)
+		successMessage = fmt.Sprintf("🛑 %s を停止しました。", FormatServiceName(serviceName))
+		errorPrefix = "停止"
+	}
+	
+	// 結果に応じてメッセージを送信
+	var content string
+	if err != nil {
+		content = fmt.Sprintf("❌ %s の%sに失敗しました: %v", FormatServiceName(serviceName), errorPrefix, err)
+		log.Printf("Service operation failed: %v", err)
+	} else {
+		content = successMessage
+	}
+	
+	// フォローアップメッセージを送信
+	_, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+		Content: content,
+	})
+	if err != nil {
+		log.Printf("Failed to send followup message: %v", err)
 	}
 }
