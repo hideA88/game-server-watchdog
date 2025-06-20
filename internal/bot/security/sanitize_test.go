@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestSanitizeErrorMessage(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestSanitizeErrorMessage(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -217,7 +217,7 @@ func TestIsCommonPath(t *testing.T) {
 	}
 }
 
-func TestIsLocalOrPrivateIP(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestIsLocalOrPrivateIP(t *testing.T) {
 	tests := []struct {
 		name     string
 		ip       string
@@ -295,7 +295,7 @@ func TestIsLocalOrPrivateIP(t *testing.T) { //nolint:funlen // テーブル駆�
 	}
 }
 
-func TestContainsCredentials(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestContainsCredentials(t *testing.T) {
 	tests := []struct {
 		name     string
 		message  string

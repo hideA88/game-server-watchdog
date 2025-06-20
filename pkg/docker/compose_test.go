@@ -81,7 +81,7 @@ func TestDefaultComposeService_getProjectName(t *testing.T) {
 	}
 }
 
-func TestCalculateCPUPercent(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestCalculateCPUPercent(t *testing.T) {
 	tests := []struct {
 		name     string
 		stats    *container.StatsResponse

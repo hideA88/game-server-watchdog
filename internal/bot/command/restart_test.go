@@ -62,7 +62,7 @@ func TestNewRestartCommand(t *testing.T) {
 	}
 }
 
-func TestRestartCommand_Execute(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestRestartCommand_Execute(t *testing.T) {
 	tests := []struct {
 		name         string
 		args         []string

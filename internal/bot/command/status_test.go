@@ -56,7 +56,7 @@ func TestStatusCommand_Description(t *testing.T) {
 	}
 }
 
-func TestStatusCommand_Execute(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestStatusCommand_Execute(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name         string

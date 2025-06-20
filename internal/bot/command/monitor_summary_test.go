@@ -8,7 +8,7 @@ import (
 	"github.com/hideA88/game-server-watchdog/pkg/system"
 )
 
-func TestMonitorCommand_buildSummaryMessage(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestMonitorCommand_buildSummaryMessage(t *testing.T) {
 	tests := []struct {
 		name         string
 		data         *MonitorData

@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-//nolint:funlen // テーブル駆動テストのため長い関数を許可
+// テーブル駆動テストのため長い関数を許可
 func TestIsValidServiceName(t *testing.T) {
 	tests := []struct {
 		name string

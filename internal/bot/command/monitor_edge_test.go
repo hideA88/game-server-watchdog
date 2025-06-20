@@ -78,7 +78,7 @@ func TestMonitorCommand_ExecuteWithLongMessage(t *testing.T) {
 	}
 }
 
-func TestMonitorCommand_collectMonitorDataWithErrors(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestMonitorCommand_collectMonitorDataWithErrors(t *testing.T) {
 	tests := []struct {
 		name               string
 		systemError        error

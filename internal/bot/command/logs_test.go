@@ -56,7 +56,7 @@ func TestNewLogsCommand(t *testing.T) {
 	}
 }
 
-func TestLogsCommand_parseLineCount(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestLogsCommand_parseLineCount(t *testing.T) { // テーブル駆動テストのため長い関数を許可
 	tests := []struct {
 		name     string
 		args     []string
@@ -126,7 +126,7 @@ func TestLogsCommand_parseLineCount(t *testing.T) { //nolint:funlen // テーブ
 	}
 }
 
-func TestLogsCommand_containerExists(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestLogsCommand_containerExists(t *testing.T) {
 	tests := []struct {
 		name        string
 		serviceName string
@@ -193,7 +193,7 @@ func TestLogsCommand_containerExists(t *testing.T) { //nolint:funlen // テー�
 	}
 }
 
-func TestLogsCommand_Execute(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestLogsCommand_Execute(t *testing.T) {
 	tests := []struct {
 		name             string
 		args             []string
@@ -424,7 +424,7 @@ func TestLogsCommand_buildLogOutput(t *testing.T) {
 	}
 }
 
-func TestLogsCommand_addFormattedLogs(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestLogsCommand_addFormattedLogs(t *testing.T) {
 	tests := []struct {
 		name                string
 		logs                string

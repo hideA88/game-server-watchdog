@@ -108,7 +108,7 @@ func TestRouter_RegisterCommand(t *testing.T) {
 	}
 }
 
-func TestParseCommand(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestParseCommand(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string
@@ -241,7 +241,7 @@ func TestCheckMention(t *testing.T) {
 	}
 }
 
-func TestRouter_ExecuteCommand(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestRouter_ExecuteCommand(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string

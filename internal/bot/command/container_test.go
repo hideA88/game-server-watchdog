@@ -56,7 +56,7 @@ func TestNewContainerCommand(t *testing.T) {
 	}
 }
 
-func TestContainerCommand_Execute(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestContainerCommand_Execute(t *testing.T) { // テーブル駆動テストのため長い関数を許可
 	tests := []struct {
 		name                string
 		args                []string
@@ -356,7 +356,7 @@ func TestContainerCommand_Execute(t *testing.T) { //nolint:funlen // テーブ�
 	}
 }
 
-func TestContainerCommand_findContainer(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestContainerCommand_findContainer(t *testing.T) { // テーブル駆動テストのため長い関数を許可
 	tests := []struct {
 		name         string
 		serviceName  string
@@ -486,7 +486,7 @@ func TestContainerCommand_addBasicInfo(t *testing.T) {
 	}
 }
 
-func TestContainerCommand_addResourceInfo(t *testing.T) { //nolint:funlen // テーブル駆動テストのため長い関数を許可
+func TestContainerCommand_addResourceInfo(t *testing.T) { // テーブル駆動テストのため長い関数を許可
 	tests := []struct {
 		name                string
 		container           *docker.ContainerInfo
