@@ -249,6 +249,32 @@ func TestLoad(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "検証エラー（短いトークン）",
+			envVars: map[string]string{
+				"DISCORD_TOKEN": "short_token",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "検証エラー（無効なチャンネルID）",
+			envVars: map[string]string{
+				"DISCORD_TOKEN":       "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
+				"ALLOWED_CHANNEL_IDS": "invalid_channel_id",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "検証エラー（無効なユーザーID）",
+			envVars: map[string]string{
+				"DISCORD_TOKEN":    "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
+				"ALLOWED_USER_IDS": "invalid_user_id",
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -435,6 +461,88 @@ func TestConfig_Validate(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "token too short",
+		},
+		{
+			name: "無効なDiscordトークン（ドットで区切られていない）",
+			config: Config{
+				DiscordToken: "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_test",
+			},
+			wantErr: true,
+			errMsg:  "invalid token format",
+		},
+		{
+			name: "無効なDockerComposePath（ファイルが存在しない）",
+			config: Config{
+				DiscordToken:      "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
+				DockerComposePath: "/non/existent/path/docker-compose.yml",
+			},
+			wantErr: true,
+			errMsg:  "DOCKER_COMPOSE_PATH file not found",
+		},
+		{
+			name: "無効なチャンネルID（短すぎる）",
+			config: Config{
+				DiscordToken:      "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
+				AllowedChannelIDs: []string{"12345"},
+			},
+			wantErr: true,
+			errMsg:  "invalid channel ID",
+		},
+		{
+			name: "無効なチャンネルID（長すぎる）",
+			config: Config{
+				DiscordToken:      "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
+				AllowedChannelIDs: []string{"12345678901234567890"},
+			},
+			wantErr: true,
+			errMsg:  "invalid channel ID",
+		},
+		{
+			name: "無効なチャンネルID（数字以外を含む）",
+			config: Config{
+				DiscordToken:      "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
+				AllowedChannelIDs: []string{"12345678901234567a"},
+			},
+			wantErr: true,
+			errMsg:  "invalid channel ID",
+		},
+		{
+			name: "無効なユーザーID（短すぎる）",
+			config: Config{
+				DiscordToken:   "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
+				AllowedUserIDs: []string{"12345"},
+			},
+			wantErr: true,
+			errMsg:  "invalid user ID",
+		},
+		{
+			name: "無効なユーザーID（数字以外を含む）",
+			config: Config{
+				DiscordToken:   "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
+				AllowedUserIDs: []string{"98765432109876543X"},
+			},
+			wantErr: true,
+			errMsg:  "invalid user ID",
+		},
+		{
+			name: "複数のエラー",
+			config: Config{
+				DiscordToken:      "short",
+				AllowedChannelIDs: []string{"invalid"},
+				AllowedUserIDs:    []string{"invalid"},
+				DockerComposePath: "/non/existent/path.yml",
+			},
+			wantErr: true,
+			errMsg:  "invalid DISCORD_TOKEN",
+		},
+		{
+			name: "空のチャンネルIDとユーザーID（エラーなし）",
+			config: Config{
+				DiscordToken:      "MTIzNDU2Nzg5MDEyMzQ1Njc4OS5GdUNrLkluc1AvdXVzZWNyZXRzaGg_.test.example",
+				AllowedChannelIDs: []string{""},
+				AllowedUserIDs:    []string{""},
+			},
+			wantErr: false,
 		},
 	}
 
