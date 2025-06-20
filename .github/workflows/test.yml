@@ -40,9 +40,9 @@ jobs:
       run: go mod download
 
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v7
+      uses: golangci/golangci-lint-action@v6
       with:
-        version: v2.1.6
+        version: v1.62.0
         args: --timeout=5m
 
   test:
