@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+
 	"github.com/hideA88/game-server-watchdog/config"
 	"github.com/hideA88/game-server-watchdog/internal/bot/command"
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
@@ -18,9 +19,19 @@ type CommandHandler struct {
 	SendMsgFunc sendMessageFunc
 }
 
-type sendMessageFunc func(s *discordgo.Session, m *discordgo.MessageCreate, content string, components []discordgo.MessageComponent) (*discordgo.Message, error)
+type sendMessageFunc func(
+	s *discordgo.Session,
+	m *discordgo.MessageCreate,
+	content string,
+	components []discordgo.MessageComponent,
+) (*discordgo.Message, error)
 
-func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, content string, components []discordgo.MessageComponent) (*discordgo.Message, error) {
+func sendMessage(
+	s *discordgo.Session,
+	m *discordgo.MessageCreate,
+	content string,
+	components []discordgo.MessageComponent,
+) (*discordgo.Message, error) {
 	if len(components) > 0 {
 		return s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
 			Content:    content,
@@ -88,7 +99,7 @@ func (r *Router) RegisterInteractionHandler(handler command.InteractionHandler) 
 }
 
 // ParseCommand はメッセージからメンションを削除してコマンドと引数を抽出
-func ParseCommand(content string, mentions []string) (string, []string) {
+func ParseCommand(content string, mentions []string) (command string, args []string) {
 	// メンション部分を削除
 	cleanContent := strings.TrimSpace(content)
 	for _, userID := range mentions {
@@ -105,8 +116,8 @@ func ParseCommand(content string, mentions []string) (string, []string) {
 		return "", nil
 	}
 
-	command := strings.ToLower(parts[0])
-	args := parts[1:]
+	command = strings.ToLower(parts[0])
+	args = parts[1:]
 	return command, args
 }
 

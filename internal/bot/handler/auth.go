@@ -1,3 +1,4 @@
+// Package handler はDiscordボットのメッセージハンドラーを提供します
 package handler
 
 import (
