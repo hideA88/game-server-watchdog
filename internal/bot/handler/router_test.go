@@ -26,9 +26,9 @@ func TestNewRouter(t *testing.T) {
 				AllowedChannelIDs: []string{},
 				AllowedUserIDs:    []string{},
 			},
-			wantCommands:            []string{"ping", "help", "status", "game-info", "monitor", "container", "restart", "logs"},
-			wantCommandCount:        8,
-			wantInteractionHandlers: 1, // game-info command
+			wantCommands:            []string{"ping", "help", "status", "monitor", "container", "restart", "logs"},
+			wantCommandCount:        7,
+			wantInteractionHandlers: 1,
 		},
 	}
 

@@ -51,8 +51,7 @@ func NewRouter(ctx context.Context, cfg *config.Config, monitor system.Monitor, 
 	pingCmd := command.NewPingCommand()
 	helpCmd := command.NewHelpCommand()
 	statusCmd := command.NewStatusCommand(monitor)
-	gameInfoCmd := command.NewGameInfoCommand(compose, cfg.DockerComposePath)
-	monitorCmd := command.NewMonitorCommand(compose, monitor, cfg.DockerComposePath)
+	monitorCmd := command.NewMonitorCommand(ctx, compose, monitor, cfg.DockerComposePath)
 	containerCmd := command.NewContainerCommand(compose, cfg.DockerComposePath)
 	restartCmd := command.NewRestartCommand(compose, cfg.DockerComposePath)
 	logsCmd := command.NewLogsCommand(compose, cfg.DockerComposePath)
@@ -60,17 +59,16 @@ func NewRouter(ctx context.Context, cfg *config.Config, monitor system.Monitor, 
 	r.RegisterCommand(pingCmd, sendMessage)
 	r.RegisterCommand(helpCmd, sendMessage)
 	r.RegisterCommand(statusCmd, sendMessage)
-	r.RegisterCommand(gameInfoCmd, sendMessage)
 	r.RegisterCommand(monitorCmd, sendMessage)
 	r.RegisterCommand(containerCmd, sendMessage)
 	r.RegisterCommand(restartCmd, sendMessage)
 	r.RegisterCommand(logsCmd, sendMessage)
 
 	// インタラクションハンドラーを登録
-	r.RegisterInteractionHandler(gameInfoCmd)
+	r.RegisterInteractionHandler(monitorCmd)
 
 	// helpコマンドに利用可能なコマンドを設定
-	commands := []command.Command{pingCmd, helpCmd, statusCmd, gameInfoCmd, monitorCmd, containerCmd, restartCmd, logsCmd}
+	commands := []command.Command{pingCmd, helpCmd, statusCmd, monitorCmd, containerCmd, restartCmd, logsCmd}
 	helpCmd.SetCommands(commands)
 
 	return r

@@ -69,7 +69,7 @@ func (c *ContainerCommand) Execute(args []string) (string, error) {
 	builder.WriteString(fmt.Sprintf("- コンテナID: %s\n", targetContainer.ID[:12]))
 
 	// 状態
-	statusIcon := getStatusIcon(targetContainer.State)
+	statusIcon := GetStatusIcon(targetContainer.State)
 	builder.WriteString(fmt.Sprintf("- 状態: %s %s\n", statusIcon, targetContainer.State))
 	if targetContainer.RunningFor != "" {
 		builder.WriteString(fmt.Sprintf("- 稼働時間: %s\n", targetContainer.RunningFor))
@@ -77,7 +77,7 @@ func (c *ContainerCommand) Execute(args []string) (string, error) {
 
 	// ヘルスチェック
 	if targetContainer.HealthStatus != "" && targetContainer.HealthStatus != "none" {
-		healthIcon := getHealthIcon(targetContainer.HealthStatus)
+		healthIcon := GetHealthIcon(targetContainer.HealthStatus)
 		builder.WriteString(fmt.Sprintf("- ヘルス: %s %s\n", healthIcon, targetContainer.HealthStatus))
 	}
 
@@ -144,7 +144,7 @@ func (c *ContainerCommand) Execute(args []string) (string, error) {
 		builder.WriteString("- `@bot restart " + serviceName + "` - コンテナを再起動\n")
 		builder.WriteString("- `@bot logs " + serviceName + " [行数]` - より多くのログを表示\n")
 	} else {
-		builder.WriteString("- `@bot game-info` から起動ボタンを使用してコンテナを起動\n")
+		builder.WriteString("- `@bot monitor` から起動ボタンを使用してコンテナを起動\n")
 	}
 
 	return builder.String(), nil
