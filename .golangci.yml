@@ -6,15 +6,21 @@ run:
   tests: true
   build-tags:
     - integration
-# v2ではformattersが独立したセクションに
 formatters:
   enable:
     - gofmt
     - goimports
   settings:
     goimports:
-      local-prefixs:
+      local-prefixes:
         - github.com/hideA88/game-server-watchdog
+output:
+  formats:
+    text:
+      path: stdout
+      print-linter-name: true
+      print-issued-lines: true
+
 linters:
   enable:
     - bodyclose
@@ -48,22 +54,24 @@ linters:
     - godox
     - wsl
     - mnd
-    # v2で削除されたlinter: gosimple, stylecheck (staticcheckに統合)
   exclusions:
-    presets:
-      - comments
-      - std-error-handling
-      - common-false-positives
-      - legacy
-  rules:
-    # Exclude some linters from running on tests files.
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - errcheck
-        - dupl
-        - gosec
-        - funlen
-    - path: main\.go
-      linters:
-        - funlen
+    rules:
+      - path: _test\.go
+        linters:
+          - funlen
+          - lll
+          - dupl
+          - gocyclo
+          - errcheck
+          - gosec
+      - path: cmd/
+        linters:
+          - gochecknoinits
+      - path: mock
+        linters:
+          - dupl
+          - funlen
+
+issues:
+  max-same-issues: 0
+  new: false
