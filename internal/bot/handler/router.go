@@ -1,14 +1,15 @@
 package handler
 
 import (
+	"context"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/hideA88/game-server-watchdog/config"
 	"github.com/hideA88/game-server-watchdog/internal/bot/command"
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
+	"github.com/hideA88/game-server-watchdog/pkg/logging"
 	"github.com/hideA88/game-server-watchdog/pkg/system"
 )
 
@@ -31,14 +32,16 @@ func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, content strin
 
 // Router はメッセージをルーティングして適切なコマンドに振り分ける
 type Router struct {
+	ctx                 context.Context
 	config              *config.Config
 	commands            map[string]*CommandHandler
 	interactionHandlers []command.InteractionHandler
 }
 
 // NewRouter は新しいルーターを作成し、コマンドを登録
-func NewRouter(cfg *config.Config, monitor system.Monitor, compose docker.ComposeService) *Router {
+func NewRouter(ctx context.Context, cfg *config.Config, monitor system.Monitor, compose docker.ComposeService) *Router {
 	r := &Router{
+		ctx:                 ctx,
 		config:              cfg,
 		commands:            make(map[string]*CommandHandler),
 		interactionHandlers: []command.InteractionHandler{},
@@ -130,6 +133,8 @@ func (r *Router) ExecuteCommand(commandName string, args []string) (string, erro
 
 // Handle はDiscordのメッセージイベントを処理
 func (r *Router) Handle(s *discordgo.Session, m *discordgo.MessageCreate) {
+	logger := logging.FromContext(r.ctx)
+
 	// ボット自身のメッセージは無視
 	if m.Author.ID == s.State.User.ID {
 		return
@@ -148,7 +153,9 @@ func (r *Router) Handle(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	// アクセス権限チェック
 	if !IsAuthorized(r.config, m.ChannelID, m.Author.ID) {
-		log.Printf("Unauthorized access attempt from user %s in channel %s", m.Author.ID, m.ChannelID)
+		logger.Warn(r.ctx, "Unauthorized access attempt",
+			logging.String("user_id", m.Author.ID),
+			logging.String("channel_id", m.ChannelID))
 		return
 	}
 
@@ -161,7 +168,7 @@ func (r *Router) Handle(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// コマンドを実行
 	result, err := r.ExecuteCommand(command, args)
 	if err != nil {
-		log.Printf("コマンド実行エラー: %v", err)
+		logger.Error(r.ctx, "コマンド実行エラー", logging.ErrorField(err))
 		_, _ = s.ChannelMessageSend(m.ChannelID, err.Error())
 		return
 	}
@@ -179,7 +186,7 @@ func (r *Router) Handle(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		if _, err := handler.SendMsgFunc(s, m, result, components); err != nil {
-			log.Printf("メッセージの送信に失敗しました: %v", err)
+			logger.Error(r.ctx, "メッセージの送信に失敗しました", logging.ErrorField(err))
 			_, _ = s.ChannelMessageSend(m.ChannelID, "メッセージの送信中にエラーが発生しました。")
 		}
 	}
@@ -187,6 +194,8 @@ func (r *Router) Handle(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 // HandleInteraction はDiscordのインタラクションイベントを処理
 func (r *Router) HandleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	logger := logging.FromContext(r.ctx)
+
 	// メッセージコンポーネントのインタラクションのみ処理
 	if i.Type != discordgo.InteractionMessageComponent {
 		return
@@ -194,7 +203,9 @@ func (r *Router) HandleInteraction(s *discordgo.Session, i *discordgo.Interactio
 
 	// アクセス権限チェック
 	if !IsAuthorized(r.config, i.ChannelID, i.Member.User.ID) {
-		log.Printf("Unauthorized interaction from user %s in channel %s", i.Member.User.ID, i.ChannelID)
+		logger.Warn(r.ctx, "Unauthorized interaction",
+			logging.String("user_id", i.Member.User.ID),
+			logging.String("channel_id", i.ChannelID))
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
@@ -203,7 +214,7 @@ func (r *Router) HandleInteraction(s *discordgo.Session, i *discordgo.Interactio
 			},
 		})
 		if err != nil {
-			log.Printf("Failed to respond to unauthorized interaction: %v", err)
+			logger.Error(r.ctx, "Failed to respond to unauthorized interaction", logging.ErrorField(err))
 		}
 		return
 	}
@@ -214,7 +225,7 @@ func (r *Router) HandleInteraction(s *discordgo.Session, i *discordgo.Interactio
 	for _, handler := range r.interactionHandlers {
 		if handler.CanHandle(data.CustomID) {
 			if err := handler.HandleInteraction(s, i); err != nil {
-				log.Printf("Failed to handle interaction: %v", err)
+				logger.Error(r.ctx, "Failed to handle interaction", logging.ErrorField(err))
 				// エラー応答を試みる
 				_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -229,5 +240,6 @@ func (r *Router) HandleInteraction(s *discordgo.Session, i *discordgo.Interactio
 	}
 
 	// 未知のインタラクション
-	log.Printf("Unknown interaction custom ID: %s", data.CustomID)
+	logger.Warn(r.ctx, "Unknown interaction custom ID",
+		logging.String("custom_id", data.CustomID))
 }

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -35,7 +36,8 @@ func TestNewRouter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMonitor := &system.MockMonitor{}
 			mockCompose := &docker.MockComposeService{}
-			router := NewRouter(tt.config, mockMonitor, mockCompose)
+			ctx := context.Background()
+			router := NewRouter(ctx, tt.config, mockMonitor, mockCompose)
 
 			// ルーターが正しく初期化されているか確認
 			if router == nil {
@@ -285,7 +287,8 @@ func TestRouter_ExecuteCommand(t *testing.T) {
 				},
 			}
 			mockCompose := &docker.MockComposeService{}
-			router := NewRouter(&config.Config{}, mockMonitor, mockCompose)
+			ctx := context.Background()
+			router := NewRouter(ctx, &config.Config{}, mockMonitor, mockCompose)
 
 			gotResult, err := router.ExecuteCommand(tt.commandName, tt.args)
 

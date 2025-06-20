@@ -1,8 +1,8 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,6 +10,7 @@ import (
 	"github.com/hideA88/game-server-watchdog/config"
 	"github.com/hideA88/game-server-watchdog/internal/bot"
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
+	"github.com/hideA88/game-server-watchdog/pkg/logging"
 	"github.com/hideA88/game-server-watchdog/pkg/system"
 )
 
@@ -31,13 +32,28 @@ func main() {
 		os.Exit(0)
 	}
 
-	log.Printf("Starting Game Server Watchdog %s (commit: %s)", version, commit)
-
 	// 設定の読み込み
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
+		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+		os.Exit(1)
 	}
+
+	// ロガーの初期化
+	logger, err := logging.New(cfg.DebugMode, cfg.LogLevel)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
+
+	// contextにloggerを設定
+	ctx := context.Background()
+	ctx = logging.WithContext(ctx, logger)
+
+	logger.Info(ctx, "Starting Game Server Watchdog",
+		logging.String("version", version),
+		logging.String("commit", commit),
+		logging.Bool("debug_mode", cfg.DebugMode))
 
 	// 依存性の初期化
 	monitor := system.NewDockerAwareMonitor()
@@ -45,26 +61,30 @@ func main() {
 	// Docker Compose サービスを作成
 	compose, err := docker.NewDefaultComposeService()
 	if err != nil {
-		log.Fatalf("Error creating compose service: %v", err)
+		logger.Error(ctx, "Error creating compose service", logging.ErrorField(err))
+		os.Exit(1)
 	}
 
 	// プロジェクト名が設定されている場合は設定
 	if cfg.DockerComposeProjectName != "" {
-		log.Printf("Setting Docker Compose project name: %s", cfg.DockerComposeProjectName)
+		logger.Info(ctx, "Setting Docker Compose project name",
+			logging.String("project_name", cfg.DockerComposeProjectName))
 		compose.SetProjectName(cfg.DockerComposeProjectName)
 	} else {
-		log.Printf("No Docker Compose project name configured")
+		logger.Info(ctx, "No Docker Compose project name configured")
 	}
 
 	// ボットの初期化
-	discordBot, err := bot.New(cfg, monitor, compose)
+	discordBot, err := bot.New(ctx, cfg, monitor, compose)
 	if err != nil {
-		log.Fatalf("Error creating bot: %v", err)
+		logger.Error(ctx, "Error creating bot", logging.ErrorField(err))
+		os.Exit(1)
 	}
 
 	// ボットの起動
-	if err := discordBot.Start(); err != nil {
-		log.Fatalf("Error starting bot: %v", err)
+	if err := discordBot.Start(ctx); err != nil {
+		logger.Error(ctx, "Error starting bot", logging.ErrorField(err))
+		os.Exit(1)
 	}
 	defer discordBot.Stop()
 

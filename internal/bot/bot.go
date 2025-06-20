@@ -1,13 +1,14 @@
 package bot
 
 import (
+	"context"
 	"fmt"
-	"log"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/hideA88/game-server-watchdog/config"
 	"github.com/hideA88/game-server-watchdog/internal/bot/handler"
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
+	"github.com/hideA88/game-server-watchdog/pkg/logging"
 	"github.com/hideA88/game-server-watchdog/pkg/system"
 )
 
@@ -16,7 +17,7 @@ type Bot struct {
 	config  *config.Config
 }
 
-func New(config *config.Config, monitor system.Monitor, compose docker.ComposeService) (*Bot, error) {
+func New(ctx context.Context, config *config.Config, monitor system.Monitor, compose docker.ComposeService) (*Bot, error) {
 	session, err := discordgo.New("Bot " + config.DiscordToken)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Discord session: %w", err)
@@ -28,20 +29,21 @@ func New(config *config.Config, monitor system.Monitor, compose docker.ComposeSe
 	}
 
 	// ルーターを初期化して登録
-	router := handler.NewRouter(config, monitor, compose)
+	router := handler.NewRouter(ctx, config, monitor, compose)
 	session.AddHandler(router.Handle)
 	session.AddHandler(router.HandleInteraction)
 
 	return bot, nil
 }
 
-func (b *Bot) Start() error {
+func (b *Bot) Start(ctx context.Context) error {
 	// セッションを開く
 	if err := b.session.Open(); err != nil {
 		return fmt.Errorf("error opening connection: %w", err)
 	}
 
-	log.Println("Bot is now running. Press CTRL-C to exit.")
+	logger := logging.FromContext(ctx)
+	logger.Info(ctx, "Bot is now running. Press CTRL-C to exit.")
 	return nil
 }
 
