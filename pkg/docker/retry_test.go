@@ -142,7 +142,9 @@ func TestWithRetry(t *testing.T) {
 				MaxDelay:   100 * time.Millisecond,
 				Backoff:    ExponentialBackoff,
 			},
-			contextFunc:  func() (context.Context, context.CancelFunc) { return context.WithTimeout(context.Background(), time.Second) },
+			contextFunc: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), time.Second)
+			},
 			wantErr:      false,
 			wantAttempts: 1,
 		},
@@ -164,7 +166,9 @@ func TestWithRetry(t *testing.T) {
 				MaxDelay:   100 * time.Millisecond,
 				Backoff:    ExponentialBackoff,
 			},
-			contextFunc:  func() (context.Context, context.CancelFunc) { return context.WithTimeout(context.Background(), time.Second) },
+			contextFunc: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), time.Second)
+			},
 			wantErr:      false,
 			wantAttempts: 2,
 		},
@@ -181,7 +185,9 @@ func TestWithRetry(t *testing.T) {
 				MaxDelay:   100 * time.Millisecond,
 				Backoff:    ExponentialBackoff,
 			},
-			contextFunc:   func() (context.Context, context.CancelFunc) { return context.WithTimeout(context.Background(), time.Second) },
+			contextFunc: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), time.Second)
+			},
 			wantErr:       true,
 			wantAttempts:  3, // 初回 + 2回のリトライ
 			checkErrorMsg: "operation failed after 2 retries",
@@ -203,7 +209,9 @@ func TestWithRetry(t *testing.T) {
 				MaxDelay:   100 * time.Millisecond,
 				Backoff:    ExponentialBackoff,
 			},
-			contextFunc:   func() (context.Context, context.CancelFunc) { return context.WithTimeout(context.Background(), time.Second) },
+			contextFunc: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), time.Second)
+			},
 			wantErr:       true,
 			wantAttempts:  1,
 			checkErrorMsg: "non-recoverable error",
@@ -272,7 +280,9 @@ func TestWithRetry(t *testing.T) {
 				MaxDelay:   100 * time.Millisecond,
 				Backoff:    LinearBackoff,
 			},
-			contextFunc:  func() (context.Context, context.CancelFunc) { return context.WithTimeout(context.Background(), time.Second) },
+			contextFunc: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), time.Second)
+			},
 			wantErr:      false,
 			wantAttempts: 3,
 		},
@@ -396,4 +406,3 @@ func TestWithRetrySimple(t *testing.T) {
 		})
 	}
 }
-

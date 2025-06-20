@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/bwmarrin/discordgo"
+
 	"github.com/hideA88/game-server-watchdog/config"
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
 	"github.com/hideA88/game-server-watchdog/pkg/logging"
