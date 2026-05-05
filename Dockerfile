@@ -47,9 +47,8 @@ RUN chmod +x game-server-watchdog /usr/local/bin/docker-entrypoint.sh
 # 所有権を変更
 RUN chown -R watchdog:watchdog /app
 
-# セキュリティ設定: 一時的にrootで起動し、entrypointでユーザー切り替え
-# これにより動的にdockerグループを設定可能
-# USER watchdog （コメントアウト）
+# USER は指定しない: docker-entrypoint.sh が docker socket の GID を検出して
+# watchdog ユーザーに切り替えるため、初回のみ root で起動する必要がある。
 
 # ヘルスチェック
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

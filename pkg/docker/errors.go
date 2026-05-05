@@ -3,6 +3,7 @@ package docker
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Docker操作に関連するエラー定義
@@ -27,7 +28,27 @@ var (
 
 	// ErrContainerNotRunning はコンテナが稼働していない際のエラー
 	ErrContainerNotRunning = errors.New("container is not running")
+
+	// ErrPermissionDenied はDocker socketへのアクセス権限が無い際のエラー
+	ErrPermissionDenied = errors.New("docker permission denied")
 )
+
+// IsPermissionDenied はDocker socketへのアクセス権限エラーかどうかを判定する。
+// errors.Is でラップ済みエラーを判定するほか、Docker SDK が直接返す
+// permission denied 系メッセージにもフォールバックで対応する。
+func IsPermissionDenied(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrPermissionDenied) {
+		return true
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "permission denied") {
+		return false
+	}
+	return strings.Contains(msg, "docker.sock") || strings.Contains(msg, "docker daemon")
+}
 
 // DockerError はDocker操作に関するエラーの詳細情報を含む構造体
 //

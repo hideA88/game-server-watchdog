@@ -101,8 +101,6 @@ watchdogをDocker Composeで安全に実行する場合の設定例：
 最新版では、Docker socketのグループIDを自動的に検出して設定します：
 
 ```yaml
-version: '3.8'
-
 services:
   watchdog:
     build: .

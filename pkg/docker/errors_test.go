@@ -334,6 +334,61 @@ func BenchmarkNewDockerError(b *testing.B) {
 	}
 }
 
+func TestIsPermissionDenied(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "Docker socket への permission denied",
+			err:  errors.New("permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock"),
+			want: true,
+		},
+		{
+			name: "dial unix での permission denied",
+			err:  errors.New("dial unix /var/run/docker.sock: connect: permission denied"),
+			want: true,
+		},
+		{
+			name: "ErrPermissionDenied をラップしたエラー",
+			err:  fmt.Errorf("failed to list containers: %w", ErrPermissionDenied),
+			want: true,
+		},
+		{
+			name: "permission denied のみ（docker無関係）",
+			err:  errors.New("permission denied"),
+			want: false,
+		},
+		{
+			name: "docker.sock を含むが permission denied ではない",
+			err:  errors.New("cannot connect to docker.sock"),
+			want: false,
+		},
+		{
+			name: "nil",
+			err:  nil,
+			want: false,
+		},
+		{
+			name: "無関係なエラー",
+			err:  errors.New("container not found"),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := IsPermissionDenied(tt.err); got != tt.want {
+				t.Errorf("IsPermissionDenied() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // エラーラッピングのテスト
 func TestDockerError_ErrorWrapping(t *testing.T) {
 	originalErr := fmt.Errorf("network timeout")
