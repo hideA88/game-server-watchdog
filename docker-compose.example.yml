@@ -4,6 +4,10 @@
 # 1. このファイルを docker-compose.yml にコピー
 # 2. .env ファイルを作成し、必要な環境変数を設定
 # 3. docker compose up -d で起動
+#
+# セキュリティ設定について:
+# - デフォルトでは docker-entrypoint.sh が自動的にdockerグループを設定します
+# - 手動設定が必要な場合は、48-50行目のコメントを解除してGIDを指定してください
 
 services:
   game-watchdog:
@@ -40,10 +44,26 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
 
-    # Dockerソケットへのアクセス権限を付与
-    # 注意: これによりコンテナはホストのDockerを完全に制御できます
+    # セキュリティ設定
+    # 方法1: 自動設定（デフォルト）
+    # docker-entrypoint.shが自動的にdockerグループを設定し、watchdogユーザーで実行
+    # 初回のみrootで起動し、設定後すぐにwatchdogユーザーに切り替わります
+    
+    # 方法2: 手動設定（root起動を完全に避けたい場合）
+    # user: watchdog
+    # group_add:
+    #   - 999  # `getent group docker`で確認したGID
+    
+    # 方法3: より厳密なセキュリティ（entrypointを使わない）
+    # user: watchdog:999  # watchdogユーザーとdockerグループGID
+    # entrypoint: ["./game-server-watchdog"]  # 直接実行
+    
+    # セキュリティオプション
     security_opt:
       - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
 
     # リソース制限（必要に応じて調整）
     deploy:

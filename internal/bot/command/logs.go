@@ -113,7 +113,7 @@ func (c *LogsCommand) containerExists(serviceName string) (bool, error) {
 // buildLogOutput はログ出力を構築する
 func (c *LogsCommand) buildLogOutput(serviceName string, lines int, logs string) string {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("📜 **%s のログ** (最後の%d行)\n", FormatServiceName(serviceName), lines))
+	builder.WriteString(fmt.Sprintf("📜 **%s のログ** (最新の%d行)\n", FormatServiceName(serviceName), lines))
 	builder.WriteString("```\n")
 
 	// ログが空の場合

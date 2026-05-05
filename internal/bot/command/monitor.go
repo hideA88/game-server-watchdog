@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	botErrors "github.com/hideA88/game-server-watchdog/internal/bot/errors"
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
 	"github.com/hideA88/game-server-watchdog/pkg/logging"
 	"github.com/hideA88/game-server-watchdog/pkg/system"
@@ -180,7 +181,11 @@ func (c *MonitorCommand) buildMonitorReport(data *MonitorData) string {
 	// コンテナテーブル
 	if data.ContainerError != nil {
 		builder.WriteString("\n⚠️ **コンテナ情報の取得に失敗しました**\n")
-		builder.WriteString(fmt.Sprintf("エラー: %v\n", data.ContainerError))
+		if botErrors.IsDockerPermissionError(data.ContainerError) {
+			builder.WriteString(botErrors.GetDockerPermissionErrorMessage())
+		} else {
+			builder.WriteString(fmt.Sprintf("エラー: %v\n", data.ContainerError))
+		}
 	} else {
 		statsMap := make(map[string]*docker.ContainerStats)
 		for i := range data.Stats {

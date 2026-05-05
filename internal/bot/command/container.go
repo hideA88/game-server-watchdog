@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	botErrors "github.com/hideA88/game-server-watchdog/internal/bot/errors"
 	"github.com/hideA88/game-server-watchdog/pkg/docker"
 )
 
@@ -91,6 +92,9 @@ func (c *ContainerCommand) Execute(args []string) (string, error) {
 func (c *ContainerCommand) findContainer(serviceName string) (*docker.ContainerInfo, error) {
 	containers, err := c.compose.ListContainers(c.composePath)
 	if err != nil {
+		if botErrors.IsDockerPermissionError(err) {
+			return nil, fmt.Errorf("docker権限エラー: %s", botErrors.GetDockerPermissionErrorMessage())
+		}
 		return nil, fmt.Errorf("コンテナ情報の取得に失敗しました: %w", err)
 	}
 

@@ -24,7 +24,9 @@ FROM alpine:latest
 # Docker APIを使用するため、docker-cliとdocker-composeは不要
 RUN apk --no-cache add ca-certificates tzdata \
   # ホストシステム監視用のツール
-  procps sysstat
+  procps sysstat \
+  # entrypointスクリプト用
+  su-exec
 
 # 非rootユーザーを作成
 RUN addgroup -g 1000 -S watchdog && \
@@ -36,18 +38,22 @@ WORKDIR /app
 # ビルドステージからバイナリをコピー
 COPY --from=builder /app/game-server-watchdog .
 
+# entrypointスクリプトをコピー
+COPY docker-entrypoint.sh /usr/local/bin/
+
 # 実行権限を付与
-RUN chmod +x game-server-watchdog
+RUN chmod +x game-server-watchdog /usr/local/bin/docker-entrypoint.sh
 
 # 所有権を変更
 RUN chown -R watchdog:watchdog /app
 
-# 非rootユーザーに切り替え
-USER watchdog
+# セキュリティ設定: 一時的にrootで起動し、entrypointでユーザー切り替え
+# これにより動的にdockerグループを設定可能
+# USER watchdog （コメントアウト）
 
 # ヘルスチェック
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD pgrep game-server-watchdog || exit 1
 
 # エントリーポイント
-ENTRYPOINT ["./game-server-watchdog"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh", "./game-server-watchdog"]

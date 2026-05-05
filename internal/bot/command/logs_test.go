@@ -219,7 +219,7 @@ func TestLogsCommand_Execute(t *testing.T) {
 				"2023-01-01 12:00:01 INFO Server listening on port 8080\n" +
 				"2023-01-01 12:00:02 INFO Ready to accept connections",
 			expectedContains: []string{
-				"📜 **Web のログ** (最後の50行)",
+				"📜 **Web のログ** (最新の50行)",
 				"```",
 				"2023-01-01 12:00:00 INFO Starting application",
 				"2023-01-01 12:00:01 INFO Server listening on port 8080",
@@ -236,7 +236,7 @@ func TestLogsCommand_Execute(t *testing.T) {
 			},
 			logs: "Database initialized\nReady for connections",
 			expectedContains: []string{
-				"📜 **Db のログ** (最後の25行)",
+				"📜 **Db のログ** (最新の25行)",
 				"Database initialized",
 				"Ready for connections",
 				"例: `@bot logs db 100`",
@@ -300,7 +300,7 @@ func TestLogsCommand_Execute(t *testing.T) {
 			},
 			logs: "Log line 1\nLog line 2",
 			expectedContains: []string{
-				"📜 **Web のログ** (最後の200行)", // 最大値に制限される
+				"📜 **Web のログ** (最新の200行)", // 最大値に制限される
 				"Log line 1",
 				"Log line 2",
 			},
@@ -313,7 +313,7 @@ func TestLogsCommand_Execute(t *testing.T) {
 			},
 			logs: "Default log content",
 			expectedContains: []string{
-				"📜 **Web のログ** (最後の50行)", // デフォルト値が使用される
+				"📜 **Web のログ** (最新の50行)", // デフォルト値が使用される
 				"Default log content",
 			},
 		},
@@ -325,7 +325,7 @@ func TestLogsCommand_Execute(t *testing.T) {
 			},
 			logs: "Web server v2 log entry",
 			expectedContains: []string{
-				"📜 **Web Server V2 のログ** (最後の30行)",
+				"📜 **Web Server V2 のログ** (最新の30行)",
 				"Web server v2 log entry",
 				"例: `@bot logs web-server_v2 100`",
 			},
@@ -391,7 +391,7 @@ func TestLogsCommand_buildLogOutput(t *testing.T) {
 			lines:       10,
 			logs:        "Log line 1\nLog line 2",
 			expectedContains: []string{
-				"📜 **Web のログ** (最後の10行)",
+				"📜 **Web のログ** (最新の10行)",
 				"```",
 				"Log line 1",
 				"Log line 2",
@@ -404,7 +404,7 @@ func TestLogsCommand_buildLogOutput(t *testing.T) {
 			lines:       20,
 			logs:        "",
 			expectedContains: []string{
-				"📜 **Empty のログ** (最後の20行)",
+				"📜 **Empty のログ** (最新の20行)",
 				"(ログがありません)",
 			},
 		},
